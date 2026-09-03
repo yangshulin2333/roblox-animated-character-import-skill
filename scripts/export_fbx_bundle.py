@@ -148,6 +148,52 @@ def image_nodes(materials: list) -> list[tuple]:
     return records
 
 
+def rebuild_base_color_material(meshes: list, texture_path: Path, material_name: str) -> dict:
+    """Create a portable basic material in the temporary scene.
+
+    Unity packages commonly keep the Renderer -> Material -> Texture relationship
+    outside the FBX. This explicit repair is used only after that relationship has
+    been audited; it never saves or modifies the source FBX.
+    """
+    if not texture_path.is_file():
+        raise FileNotFoundError(f"Base-color texture not found: {texture_path}")
+    missing_uv = [mesh.name for mesh in meshes if len(mesh.data.uv_layers) == 0]
+    if missing_uv:
+        raise ValueError("Cannot rebuild a textured material without UVs: " + ", ".join(missing_uv))
+
+    image = bpy.data.images.load(str(texture_path), check_existing=False)
+    try:
+        image.colorspace_settings.name = "sRGB"
+    except (AttributeError, TypeError):
+        pass
+
+    material = bpy.data.materials.new(name=material_name)
+    material.use_nodes = True
+    nodes = material.node_tree.nodes
+    links = material.node_tree.links
+    principled = next((node for node in nodes if node.type == "BSDF_PRINCIPLED"), None)
+    if principled is None:
+        raise RuntimeError("The new material has no Principled BSDF node.")
+    image_node = nodes.new("ShaderNodeTexImage")
+    image_node.name = "Roblox_BaseColor"
+    image_node.label = texture_path.name
+    image_node.image = image
+    links.new(image_node.outputs["Color"], principled.inputs["Base Color"])
+
+    for mesh in meshes:
+        mesh.data.materials.clear()
+        mesh.data.materials.append(material)
+
+    return {
+        "mode": "external_base_color_rebuild",
+        "material": material.name,
+        "texture_name": texture_path.name,
+        "texture_sha256": sha256_file(texture_path),
+        "assigned_meshes": [mesh.name for mesh in meshes],
+        "source_modified": False,
+    }
+
+
 def packed_extension(image) -> str:
     suffix = Path(str(image.filepath or "")).suffix.lower()
     if suffix:
@@ -369,7 +415,9 @@ def main() -> int:
     parser.add_argument("--armature")
     parser.add_argument("--action", action="append", default=[])
     parser.add_argument("--all-actions", action="store_true")
-    parser.add_argument("--texture-mode", choices=("linked", "separate", "embed", "none"), default="embed")
+    parser.add_argument("--texture-mode", choices=("linked", "separate", "embed", "none"), default="separate")
+    parser.add_argument("--base-color-texture")
+    parser.add_argument("--material-name", default="Roblox_BaseColor")
     parser.add_argument("--fix-max-influences", action="store_true")
     parser.add_argument("--all-in-one", action="store_true")
     args = parser.parse_args(argv_after_separator())
@@ -386,6 +434,13 @@ def main() -> int:
     pre_export_report = collect_report(source)
     armature = select_target_armature(args.armature)
     meshes = meshes_for_armature(armature)
+    appearance_repair = None
+    if args.base_color_texture:
+        appearance_repair = rebuild_base_color_material(
+            meshes,
+            Path(args.base_color_texture).expanduser().resolve(),
+            args.material_name,
+        )
 
     root_names = {bone.name for bone in armature.data.bones if bone.parent is None}
     root_weighted = sum(
@@ -502,6 +557,7 @@ def main() -> int:
         )
         all_in_one_record = file_record(all_in_one_path, output_dir, "all_in_one")
         all_in_one_record["expected_action_count"] = len(actions)
+        all_in_one_record["role"] = "preview_only"
         files.append(all_in_one_record)
 
     animation_data.action = None
@@ -514,7 +570,7 @@ def main() -> int:
     files.append(file_record(output_dir / "texture_manifest.json", output_dir, "metadata"))
 
     manifest = {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "status": "EXPORT_PASS" if not skipped_actions and not root_review else "EXPORT_REVIEW_REQUIRED",
         "source": {
             "name": source.name,
@@ -527,6 +583,7 @@ def main() -> int:
             "armature": armature.name,
             "mesh_names": [mesh.name for mesh in meshes],
             "one_animation_track_per_fbx": True,
+            "formal_runtime_contract": "model_bind_plus_one_action_files",
         },
         "export_settings": {
             "axis_forward": "Z",
@@ -543,6 +600,7 @@ def main() -> int:
             "after": after_influences,
         },
         "root_review": root_review,
+        "appearance_repair": appearance_repair,
         "actions": exported_actions,
         "all_in_one": all_in_one_record,
         "skipped_actions": skipped_actions,
@@ -550,6 +608,7 @@ def main() -> int:
         "source_inspection_summary": pre_export_report["summary"],
         "notes": [
             "The source file was opened in a temporary Blender session and was not saved.",
+            "model_all_in_one.fbx is preview-only when present and is not the cross-computer animation contract.",
             "Studio import, asset permissions, and runtime playback still require separate evidence.",
         ],
     }

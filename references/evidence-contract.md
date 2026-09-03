@@ -7,6 +7,8 @@ Use this contract to prevent “works on my machine” reports. Every claim must
 | File / evidence | Produced by | Proves | Does not prove |
 | --- | --- | --- | --- |
 | `source_intake.json` | `intake_source.ps1` | 原始容器、分卷、标准化路径和资源生态 | 模型适用于 Roblox |
+| `batch_manifest.json` / `job_state.json` | `run_batch.ps1` | 批次拆分、任务指纹、尝试次数、最高门禁和恢复点 | Studio 已导入或云端素材可用 |
+| `texture_index.json` / `studio_asset_registry.json` | batch/Studio record scripts | 重复贴图哈希与同 Creator/Universe 的已验证复用记录 | 未经 fresh Play 的素材权限 |
 | `preflight_report.json` or console JSON | `preflight.ps1` | source/tool discovery on this computer | asset compatibility |
 | `inspection_report.json` | Blender inspector | source geometry/rig/action facts | Studio import/playback |
 | `bundle_manifest.json` | Blender exporter | exact delivered files, actions, hashes, in-memory fixes | Roblox acceptance |
@@ -125,6 +127,7 @@ Use exactly one highest status and list lower gates separately:
 **Payload**
 
 - the generated export directory;
+- `batch_manifest.json`、各任务 `job_state.json` 和 `studio_import_plan.json`；
 - this Skill or its public repository URL;
 - completed report;
 - source redistribution statement;

@@ -74,9 +74,9 @@ Do not use only **Reconfigure** as proof the new file was parsed. The official I
 
 ## 3. Texture path
 
-### Preferred visual path and fallback
+### 正式便携路径与可选嵌入预览
 
-Prefer the audited embedded `model_all_in_one.fbx` or `model_bind.fbx` when it preserves UV, material, and image mapping. If Roblox rejects the embedded image transaction, use the `separate` bundle with `textures/` and `texture_manifest.json` to isolate model/rig import from image upload.
+默认使用 `model_bind.fbx`、`textures/` 和 `texture_manifest.json`，把模型/骨架上传与图片上传拆开。这样 `base_color_texture` 上传失败时，不必再次上传网格和骨架。`model_all_in_one.fbx` 只有在清单标记 `preview_only` 时作为可选预览；它不是跨电脑正式动作交付。
 
 1. Import images through the exact target experience's Asset Manager/Importer under the recorded Creator.
 2. When the target is saved/published, use the current-experience grant path; do not default to Open Use.
@@ -114,6 +114,8 @@ Roblox notes that restricted assets need explicit creator/game permission, and t
 ## 4. Animation import
 
 Use one animation FBX per action from `animations/`.
+
+批量任务先按 `studio_import_plan.json` 只导入 `canary_animation`。只有模型外观、动作时间推进、骨骼变化和视觉形变均通过，才继续导入 `remaining_animations`。
 
 For each action:
 

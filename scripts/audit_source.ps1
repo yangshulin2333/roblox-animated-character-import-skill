@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
     [string]$Source,
@@ -14,7 +14,9 @@ param(
 
     [string]$ReportDir,
 
-    [string]$ReportPath
+    [string]$ReportPath,
+
+    [switch]$HashSources
 )
 
 Set-StrictMode -Version Latest
@@ -38,7 +40,15 @@ $preflightReport = Join-Path $resolvedReportDir 'preflight_report.json'
 $intakeReport = Join-Path $resolvedReportDir 'source_intake.json'
 if (-not $IntakeWorkDir) { $IntakeWorkDir = Join-Path $resolvedReportDir 'intake' }
 
-& $intakeScript -Source $Source -WorkDir $IntakeWorkDir -ReportPath $intakeReport -ArchiveToolPath $ArchiveToolPath -Extract | Out-Null
+$intakeArguments = @{
+    Source = $Source
+    WorkDir = $IntakeWorkDir
+    ReportPath = $intakeReport
+    Extract = $true
+}
+if ($ArchiveToolPath) { $intakeArguments.ArchiveToolPath = $ArchiveToolPath }
+if ($HashSources) { $intakeArguments.HashSources = $true }
+& $intakeScript @intakeArguments | Out-Null
 $intakeExit = $LASTEXITCODE
 $intake = Get-Content -Raw -LiteralPath $intakeReport | ConvertFrom-Json
 

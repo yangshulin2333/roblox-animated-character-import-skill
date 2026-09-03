@@ -45,6 +45,7 @@ def main() -> int:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
     errors = []
+    warnings = []
     checked = []
     file_records = manifest.get("files", [])
     for record in file_records:
@@ -73,6 +74,50 @@ def main() -> int:
             }
         )
 
+    appearance_manifest_path = bundle / "appearance_manifest.json"
+    appearance_manifest_sha256 = None
+    appearance_files_checked = []
+    if appearance_manifest_path.is_file():
+        appearance_manifest_sha256 = sha256_file(appearance_manifest_path)
+        appearance_manifest = json.loads(appearance_manifest_path.read_text(encoding="utf-8-sig"))
+        if appearance_manifest.get("status") != "APPEARANCE_BUNDLE_PASS":
+            errors.append("Appearance manifest is not APPEARANCE_BUNDLE_PASS")
+        appearances = appearance_manifest.get("appearances", [])
+        declared_appearance_count = appearance_manifest.get("appearance_count")
+        if declared_appearance_count != len(appearances):
+            errors.append(
+                f"Appearance count {len(appearances)} does not match declared count {declared_appearance_count}"
+            )
+        seen_appearance_paths = set()
+        for record in appearance_manifest.get("material_catalog", []):
+            relative = record.get("texture")
+            if not isinstance(relative, str):
+                errors.append("Appearance material entry has no string texture path")
+                continue
+            if relative in seen_appearance_paths:
+                continue
+            seen_appearance_paths.add(relative)
+            try:
+                path = safe_bundle_path(bundle, relative)
+            except Exception as exc:
+                errors.append(str(exc))
+                continue
+            if not path.is_file():
+                errors.append(f"Missing appearance texture: {relative}")
+                continue
+            actual_hash = sha256_file(path)
+            expected_hash = record.get("texture_sha256")
+            if actual_hash != expected_hash:
+                errors.append(f"Appearance SHA-256 mismatch: {relative}")
+            appearance_files_checked.append(
+                {
+                    "path": relative,
+                    "size_bytes": path.stat().st_size,
+                    "sha256": actual_hash,
+                    "match": actual_hash == expected_hash,
+                }
+            )
+
     model_records = [record for record in file_records if record.get("kind") == "model"]
     animation_records = [record for record in file_records if record.get("kind") == "animation"]
     all_in_one_records = [record for record in file_records if record.get("kind") == "all_in_one"]
@@ -85,18 +130,31 @@ def main() -> int:
         )
     if len(all_in_one_records) > 1:
         errors.append(f"Expected at most one all-in-one FBX, found {len(all_in_one_records)}")
+    schema_version = str(manifest.get("schema_version", "1.0"))
+    for record in all_in_one_records:
+        if schema_version >= "1.1" and record.get("role") != "preview_only":
+            errors.append("All-in-one FBX must be declared preview_only")
+        elif schema_version < "1.1" and record.get("role") != "preview_only":
+            warnings.append("Legacy all-in-one FBX has no preview_only declaration")
     for record in model_records + animation_records + all_in_one_records:
         if not str(record.get("path", "")).lower().endswith(".fbx"):
             errors.append(f"Non-FBX model/animation entry: {record.get('path')}")
     if not manifest.get("target", {}).get("one_animation_track_per_fbx"):
         errors.append("Manifest does not declare one animation track per FBX")
+    if schema_version >= "1.1" and manifest.get("target", {}).get("formal_runtime_contract") != "model_bind_plus_one_action_files":
+        errors.append("Manifest does not declare the formal bind-plus-one-action runtime contract")
+    elif schema_version < "1.1" and not manifest.get("target", {}).get("formal_runtime_contract"):
+        warnings.append("Legacy bundle has no formal runtime contract declaration")
 
     report = {
         "schema_version": "1.0",
         "status": "BUNDLE_PASS" if not errors else "BUNDLE_BLOCKED",
         "bundle_manifest_sha256": sha256_file(manifest_path),
+        "appearance_manifest_sha256": appearance_manifest_sha256,
         "files_checked": checked,
+        "appearance_files_checked": appearance_files_checked,
         "errors": errors,
+        "warnings": warnings,
     }
     report_path = (
         Path(args.report).expanduser().resolve()

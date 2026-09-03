@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "jobs": [
+    {
+      "source_name": "character.unitypackage",
+      "fix_max_influences": true,
+      "base_color_texture": "textures/character_color.png",
+      "material_name": "Character_BaseColor",
+      "texture_mode": "separate",
+      "include_preview_all_in_one": false,
+      "allow_untextured": false
+    }
+  ]
+}

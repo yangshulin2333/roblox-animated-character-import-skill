@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
     [string]$Source,
@@ -20,8 +20,12 @@ param(
 
     [switch]$AllowUntextured,
 
+    [string]$BaseColorTexture,
+
+    [string]$MaterialName = 'Roblox_BaseColor',
+
     [ValidateSet('linked', 'separate', 'embed', 'none')]
-    [string]$TextureMode = 'embed'
+    [string]$TextureMode = 'separate'
 )
 
 Set-StrictMode -Version Latest
@@ -32,6 +36,9 @@ if ($AllActions -and $Actions.Count -gt 0) {
 }
 if (-not (Test-Path -LiteralPath $Source -PathType Leaf)) {
     throw 'run_pipeline.ps1 requires one exact source model file. Run preflight on a directory/ZIP first.'
+}
+if ($BaseColorTexture -and -not (Test-Path -LiteralPath $BaseColorTexture -PathType Leaf)) {
+    throw "Base-color texture does not exist: $BaseColorTexture"
 }
 
 $resolvedSource = (Resolve-Path -LiteralPath $Source).Path
@@ -85,7 +92,10 @@ if (-not $AllowUntextured) {
     } else {
         [int]$inspection.summary.image_count
     }
-    if ($missingUv.Count -gt 0 -or $missingMaterial.Count -gt 0 -or $materialImageCount -eq 0) {
+    if ($missingUv.Count -gt 0) {
+        throw "SOURCE_APPEARANCE_BLOCKED: at least one visible mesh has no UV layer. See $inspectionReport"
+    }
+    if (-not $BaseColorTexture -and ($missingMaterial.Count -gt 0 -or $materialImageCount -eq 0)) {
         throw "SOURCE_APPEARANCE_BLOCKED: the selected source does not preserve complete UV/material/image mapping. Inspect sibling DCC files before export, or pass -AllowUntextured only when a white model is intentional. See $inspectionReport"
     }
 }
@@ -102,6 +112,10 @@ if ($AllActions) { $exportArguments += '--all-actions' }
 foreach ($action in $Actions) { $exportArguments += @('--action', $action) }
 if ($FixMaxInfluences) { $exportArguments += '--fix-max-influences' }
 if ($AllInOne) { $exportArguments += '--all-in-one' }
+if ($BaseColorTexture) {
+    $resolvedBaseColorTexture = (Resolve-Path -LiteralPath $BaseColorTexture).Path
+    $exportArguments += @('--base-color-texture', $resolvedBaseColorTexture, '--material-name', $MaterialName)
+}
 
 & $blender @exportArguments
 if ($LASTEXITCODE -ne 0) { throw "FBX export failed. Inspect the Blender output and $inspectionReport" }
@@ -121,10 +135,9 @@ $result = [ordered]@{
     action_count = @($manifest.actions).Count
     skipped_actions = @($manifest.skipped_actions)
     texture_mode = $TextureMode
-    next_gate = if ($AllInOne) {
-        'Try model_all_in_one.fbx in the exact Studio place first; keep model_bind.fbx plus one-action FBXs as the portable fallback.'
-    } else {
-        'Import model_bind.fbx into the exact Roblox Studio place, then import each action onto the same rig.'
-    }
+    base_color_texture = if ($BaseColorTexture) { $resolvedBaseColorTexture } else { $null }
+    formal_delivery = 'model_bind.fbx + animations/<one-action>.fbx + textures/ + manifests'
+    preview_all_in_one = if ($AllInOne) { (Join-Path $resolvedOutput 'model_all_in_one.fbx') } else { $null }
+    next_gate = 'Import model_bind.fbx into the exact Roblox Studio place, assign the declared external textures, validate one canary action, then import the remaining one-action FBXs. model_all_in_one.fbx is preview-only when present.'
 }
 $result | ConvertTo-Json -Depth 6

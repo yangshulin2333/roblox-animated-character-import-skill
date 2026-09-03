@@ -1,5 +1,21 @@
 # Validation record
 
+## 2026-09-03 — v2 批处理与外部贴图正式契约
+
+使用同一私有蝎子原始 GZIP/UnityPackage 执行 `run_batch.ps1 -Convert -FixMaxInfluences -BaseColorTexture ...`：
+
+- 原始包 SHA-256：`cf4fe0dd622ea363ffd4291109069e1396b418b45fe488b5e189900eb69a71a1`；
+- 批处理从原始包重新解包、审计并选中标准化后的 `Monster15_AllAnim.fbx`；
+- 输出默认使用 `TextureMode=separate`，没有生成 `model_all_in_one.fbx`；
+- 正式交付为 1 个 `model_bind.fbx`、17 个单动作 FBX、1 张外部基础色贴图及 JSON 清单；
+- Blender 新进程回读和 `bundle_validation.json` 均通过，最高状态为 `ROUNDTRIP_PASS`；
+- 生成 `job_state.json`、`batch_manifest.json`、`texture_index.json` 和 `studio_import_plan.json`，批次状态为 `READY_FOR_STUDIO`；
+- 前两次调用层参数转发错误被记录为失败尝试，修正后用同一任务 `-Resume` 完成，证明失败证据和断点路径有效；
+- 重新打包后的离线 ZIP 可安装到空目录，Skill 快速校验通过；其中 7 个 PowerShell 脚本均使用 UTF-8 BOM，并在 Windows PowerShell 5.1 解析为 0 错误；离线安装副本实际执行 `run_batch.ps1 -PlanOnly` 返回 `BATCH_PLANNED`；
+- 本轮没有再次上传 Roblox 云端素材，也没有保存/另存 Studio 项目，因此没有新增 `STUDIO_IMPORT_PASS` 或运行时权限结论。
+
+回归输出位于本机 `D:\Work\RobloxBatchV2_Scorpion_20260903_205227`；私有模型不进入仓库。
+
 ## 2026-09-03 — 原始 UnityPackage 与 RAR5 分卷入口
 
 本轮使用两个私有原始资源做回归测试，资源本身不进入仓库。

@@ -22,6 +22,24 @@ $roblox-animated-character-import 把 D:\path\character.zip 导入当前 Roblox 
 
 ## 最短使用方式
 
+大量资源优先走批处理入口。先预览会拆成几个任务（不解包、不转换）：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_batch.ps1 `
+  -Source "D:\原始资源目录" `
+  -OutputRoot "D:\Roblox批处理\本批次" `
+  -PlanOnly
+```
+
+确认后审计并转换；中断或修正配置后加 `-Resume`，已完成任务不会重复导出：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_batch.ps1 `
+  -Source "D:\原始资源目录" `
+  -OutputRoot "D:\Roblox批处理\本批次" `
+  -Convert
+```
+
 对原始包执行一体化审计；脚本会先识别容器、生成独立检测工作目录，再检查模型内容，这一步不会转换或覆盖原模型：
 
 ```powershell
@@ -48,9 +66,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_pipeline.ps1 `
   -Source "D:\path\character.blend" `
   -OutputDir "D:\path\RobloxExport" `
   -AllActions `
-  -FixMaxInfluences `
-  -AllInOne `
-  -TextureMode embed
+  -FixMaxInfluences
 ```
 
 默认行为：
@@ -58,7 +74,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_pipeline.ps1 `
 - 不覆盖源文件；
 - 不自动另存 Roblox Studio 项目；
 - 默认拒绝缺少 UV、材质槽或材质贴图引用的角色，避免再次生成白模；
-- 输出一个绑定模型 FBX、每个动作一个 FBX、JSON 清单，并可额外输出带嵌入贴图和全部动作的 `model_all_in_one.fbx`；
+- 默认输出一个绑定模型 FBX、每个动作一个 FBX、外部贴图和 JSON 清单；
+- `-AllInOne` 只额外生成预览用 `model_all_in_one.fbx`，不作为跨电脑正式动画契约；
 - 检测到每顶点超过 4 根骨骼影响时停止。确认需要自动裁减时再加 `-FixMaxInfluences`；
 - 输出目录非空时停止，避免覆盖上一轮结果。
 - 在已保存/已发布的目标体验中上传时，优先依靠 **Add to Workspace** 自动授予当前体验使用权限；不会把“设置为开放使用”当成协作者项目的默认修复。
@@ -68,7 +85,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_pipeline.ps1 `
 
 这套 Skill 无法保证任意第三方模型都能 100% 导入。损坏文件、未授权资产、不可兼容骨架、Roblox 审核或账户权限都可能阻止完成。它保证的是：每一步都有可复现输入、明确状态、失败恢复路径和可核验证据，不再把“预览正常”误报为“运行正常”。
 
-原始资源规则见 [references/source-intake.md](references/source-intake.md)，完整流程见 [references/workflow.md](references/workflow.md)，Studio 操作见 [references/studio-runbook.md](references/studio-runbook.md)。
+原始资源规则见 [references/source-intake.md](references/source-intake.md)，批处理见 [references/batch-workflow.md](references/batch-workflow.md)，完整流程见 [references/workflow.md](references/workflow.md)，Studio 操作见 [references/studio-runbook.md](references/studio-runbook.md)。
 
 脚本的真实运行记录见 [VALIDATION.md](VALIDATION.md)。
 
