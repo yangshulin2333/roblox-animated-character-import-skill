@@ -1,5 +1,26 @@
 # Validation record
 
+## 2026-09-03 — 原始 UnityPackage 与 RAR5 分卷入口
+
+本轮使用两个私有原始资源做回归测试，资源本身不进入仓库。
+
+### UnityPackage/GZIP 正常路径
+
+- 输入扩展名为 `.gz`，文件签名为 GZIP，解压前缀确认内部是 TAR `ustar` 和 Unity GUID 目录。
+- `intake_source.ps1 -Extract` 安全列出 2,834 个 TAR 条目，并还原 600 条 UnityPackage 逻辑资源记录。
+- 还原结果检测到 Unity 生态、1 个核心 FBX、135 张纹理、0 个路径冲突和 0 个嵌套压缩包。
+- `audit_source.ps1` 可以直接接收原始 `.gz`，无需用户预先手动解压或指出 FBX。
+- 内容审计选中 `Monster15_AllAnim.fbx`：1 个网格、3,786 个三角面、1 套骨架、17 个动作。
+- 审计返回 `CONVERSION_REQUIRED`，原因是 359 个顶点超过四骨骼影响，并且原 FBX 没有保留材质槽/图片引用；没有把它误报为可直接导入。
+
+### RAR5 分卷阻止路径
+
+- 一个目录内的 `part1.rar` 到 `part4.rar` 被识别为 1 个资源组，而不是 4 个独立任务。
+- 四卷连续、无缺卷，总大小 7,703,820,318 字节。
+- 本机 PATH 中的 7-Zip 9.10 无法读取 RAR5；脚本返回 `EXTRACTOR_REQUIRED`，并给出中文下一步。
+- 该结果只说明解包工具不兼容，不能据此判定 Unreal 模型损坏。
+- 自动安装新版工具被当前执行策略拦截，因此没有替换旧 7-Zip，也没有解包这套私有资源。
+
 ## 2026-09-03 — Windows / Blender 5.1.1 / Roblox Studio
 
 The test source is a privately supplied animated Custom Rig and is not included in this repository.

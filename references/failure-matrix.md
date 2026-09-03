@@ -4,6 +4,10 @@ Read this before retrying. A retry must change a relevant condition and must not
 
 | Symptom / evidence | Likely class | Recovery | Stop condition |
 | --- | --- | --- | --- |
+| `.gz` 实际是 UnityPackage | 原始容器识别 | 按 GZIP/TAR 签名读取 Unity GUID、`pathname` 和 `asset`，还原逻辑目录 | 路径不安全或 TAR 损坏时 `SOURCE_INTAKE_BLOCKED` |
+| `.part1.rar` 到 `.partN.rar` 同名连续 | RAR 分卷 | 归并为一个资源组，从 part1 联合检测；不要逐卷处理 | 缺卷时 `ARCHIVE_MULTIPART_INCOMPLETE` |
+| RAR5 被旧版 7-Zip 报为无法打开 | 解包工具版本 | 指定支持 RAR5 的新版 7-Zip/7zz，再改变工具条件重试一次 | `EXTRACTOR_REQUIRED`，不能据此判定模型损坏 |
+| 一个目录包含多个独立压缩包 | 资源选择 | 先列出资源组、大小和生态信号，由用户选择后分别审计 | `SOURCE_SELECTION_REQUIRED` |
 | Source path does not exist on another PC | Handoff/path | Use the recipient's absolute source path; never reuse sender paths | `SOURCE_BLOCKED` if the actual asset is absent |
 | `.fbx` path is a directory or ZIP wrapper | Input shape | Inventory the path and locate the real model file | stop if no supported file exists |
 | Blender executable not found | Environment | Pass `-BlenderPath`, set `BLENDER_EXE`, or install a compatible Blender version | `PREFLIGHT_BLOCKED` |

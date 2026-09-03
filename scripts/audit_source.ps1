@@ -8,6 +8,10 @@ param(
 
     [string]$BlenderPath,
 
+    [string]$ArchiveToolPath,
+
+    [string]$IntakeWorkDir,
+
     [string]$ReportDir,
 
     [string]$ReportPath
@@ -28,15 +32,73 @@ if (-not $ReportPath) {
 $resolvedReportPath = [System.IO.Path]::GetFullPath($ReportPath)
 
 $preflightScript = Join-Path $PSScriptRoot 'preflight.ps1'
+$intakeScript = Join-Path $PSScriptRoot 'intake_source.ps1'
 $inspectScript = Join-Path $PSScriptRoot 'inspect_in_blender.py'
 $preflightReport = Join-Path $resolvedReportDir 'preflight_report.json'
+$intakeReport = Join-Path $resolvedReportDir 'source_intake.json'
+if (-not $IntakeWorkDir) { $IntakeWorkDir = Join-Path $resolvedReportDir 'intake' }
 
-& $preflightScript -Source $Source -BlenderPath $BlenderPath -ReportPath $preflightReport | Out-Null
+& $intakeScript -Source $Source -WorkDir $IntakeWorkDir -ReportPath $intakeReport -ArchiveToolPath $ArchiveToolPath -Extract | Out-Null
+$intakeExit = $LASTEXITCODE
+$intake = Get-Content -Raw -LiteralPath $intakeReport | ConvertFrom-Json
+
+if ($intakeExit -ne 0 -or [string]$intake.status -ne 'SOURCE_NORMALIZED') {
+    $blockedStatus = if (@($intake.blockers).Count -gt 0) { [string]$intake.blockers[0].code } else { 'SOURCE_INTAKE_BLOCKED' }
+    $blockedReport = [ordered]@{
+        schema_version = '2.0'
+        status = $blockedStatus
+        status_zh = [string]$intake.status_zh
+        intended_use = $IntendedUse
+        requested_source = $Source
+        normalized_source = $null
+        selected_source = $null
+        candidates = @()
+        intake = [ordered]@{
+            status = [string]$intake.status
+            container_type = if ($null -ne $intake.container) { [string]$intake.container.type } else { $null }
+            resource_groups = @($intake.resource_groups)
+            blockers = @($intake.blockers)
+            warnings = @($intake.warnings)
+            report = $intakeReport
+        }
+        next_action_zh = [string]$intake.next_action_zh
+        next_action = [string]$intake.next_action_zh
+        note_zh = '尚未进入 Blender 内容检测，也没有生成 Roblox 导出文件。'
+        note = '尚未进入 Blender 内容检测，也没有生成 Roblox 导出文件。'
+    }
+    $parent = Split-Path -Parent $resolvedReportPath
+    if ($parent) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
+    $blockedJson = $blockedReport | ConvertTo-Json -Depth 16
+    [System.IO.File]::WriteAllText($resolvedReportPath, $blockedJson + [Environment]::NewLine, [System.Text.UTF8Encoding]::new($false))
+    $blockedJson
+    exit 2
+}
+
+$normalizedSource = [string]$intake.normalized_source
+& $preflightScript -Source $normalizedSource -BlenderPath $BlenderPath -ReportPath $preflightReport | Out-Null
 $preflight = Get-Content -Raw -LiteralPath $preflightReport | ConvertFrom-Json
 
 $candidateResults = @()
 $candidates = @($preflight.source.candidates)
 $blender = [string]$preflight.blender.path
+
+function Get-ReasonZh {
+    param([string]$Code)
+    switch ($Code) {
+        'NO_MESH' { '没有可渲染网格' }
+        'MESH_TRIANGLE_LIMIT' { '至少一个独立网格超过 Roblox 三角面上限' }
+        'ARMATURE_MISSING' { '缺少骨架' }
+        'ACTIONS_MISSING' { '缺少骨骼动画' }
+        'MAX_INFLUENCES_EXCEEDED' { '存在超过四根骨骼影响的顶点' }
+        'UV_MISSING' { '至少一个可见网格缺少 UV' }
+        'MATERIAL_MAPPING_MISSING' { '至少一个可见网格缺少材质槽或材质映射' }
+        'IMAGE_REFERENCE_MISSING' { '材质没有实际引用可用贴图' }
+        'FORMAT_CONVERSION_REQUIRED' { '源格式需要转换为 Roblox 兼容 FBX' }
+        'R15_SCHEMA_REVIEW_REQUIRED' { '需要单独进行 R15/Avatar 结构审查' }
+        'BLENDER_INSPECTION_FAILED' { 'Blender 无法完成内容检测' }
+        default { "需要检查：$Code" }
+    }
+}
 
 if ($candidates.Count -gt 0 -and $blender) {
     $index = 0
@@ -113,6 +175,7 @@ if ($candidates.Count -gt 0 -and $blender) {
         if ($influencesPass) { $score += 15 } else { $score -= 20 }
         if (-not $allTriangleLimitsPass) { $score -= 200 }
         if ($hardBlockers.Count -gt 0) { $score -= 300 }
+        $reasonArray = $reasonCodes.ToArray()
 
         $candidateResults += [pscustomobject][ordered]@{
             path = $candidate
@@ -122,7 +185,8 @@ if ($candidates.Count -gt 0 -and $blender) {
             conversion_candidate = $conversionCandidate
             appearance_mapping_ready = $appearanceReady
             score = $score
-            reason_codes = @($reasonCodes)
+            reason_codes = $reasonArray
+            reasons_zh = @($reasonArray | ForEach-Object { Get-ReasonZh -Code $_ })
             facts = [ordered]@{
                 meshes = [int]$inspection.summary.mesh_count
                 vertices = [int]$inspection.summary.vertices
@@ -147,27 +211,41 @@ $selected = $candidateResults |
     Select-Object -First 1
 
 $status = 'SOURCE_BLOCKED'
-$nextAction = 'Provide a readable source model and its textures.'
+$statusZh = '原始资源中没有找到可继续处理的动画角色源'
+$nextAction = '请提供可读取的模型、骨架、动画和贴图源文件。'
 if ($selected) {
     if ($selected.direct_import_candidate) {
         $status = 'DIRECT_IMPORT_CANDIDATE'
-        $nextAction = 'Import this candidate in the exact Studio place and complete texture, playback, permission, and scale gates.'
+        $statusZh = '找到可进入 Roblox Studio 导入验证的候选文件'
+        $nextAction = '在目标 Studio 项目中导入该候选文件，并继续检查贴图、动作、权限和尺寸。'
     } else {
         $status = 'CONVERSION_REQUIRED'
-        $nextAction = 'Use the selected candidate for a temporary Blender conversion, then read back the exported FBX before Studio import.'
+        $statusZh = '找到可转换的角色源，但必须先修复或转换'
+        $nextAction = '使用临时 Blender 场景处理选中的源文件，导出 FBX 后重新读取验证，再进入 Studio。'
     }
 } elseif (@($preflight.source.native_dcc_files).Count -gt 0) {
     $status = 'NATIVE_DCC_EXPORT_REQUIRED'
-    $nextAction = 'Open the native DCC/project and export FBX or glTF with mesh, rig, actions, UVs, and external textures.'
+    $statusZh = '只找到原生工程资源，需要从对应软件导出'
+    $nextAction = '使用原生 Unity、Unreal、3ds Max、Maya 或 Blender 打开资源，导出包含模型、骨架、动画、UV 和贴图关系的 FBX/glTF。'
 }
 
 $report = [ordered]@{
-    schema_version = '1.0'
+    schema_version = '2.0'
     status = $status
+    status_zh = $statusZh
     intended_use = $IntendedUse
     requested_source = $Source
+    normalized_source = $normalizedSource
     selected_source = if ($selected) { $selected.path } else { $null }
     candidates = @($candidateResults)
+    intake = [ordered]@{
+        status = [string]$intake.status
+        status_zh = [string]$intake.status_zh
+        container_type = if ($null -ne $intake.container) { [string]$intake.container.type } else { $null }
+        detected_ecosystems = if ($null -ne $intake.inventory) { @($intake.inventory.detected_ecosystems) } else { @() }
+        asset_groups = if ($null -ne $intake.inventory) { @($intake.inventory.asset_groups) } else { @() }
+        report = $intakeReport
+    }
     preflight = [ordered]@{
         status = [string]$preflight.status
         detected_projects = @($preflight.source.detected_projects)
@@ -179,8 +257,10 @@ $report = [ordered]@{
         triangles_per_mesh = 20000
         maximum_positive_bone_influences_per_vertex = 4
     }
+    next_action_zh = $nextAction
     next_action = $nextAction
-    note = 'DIRECT_IMPORT_CANDIDATE is not Studio acceptance. Texture rendering, animation playback, permissions, scale, and target-device performance remain separate gates.'
+    note_zh = 'DIRECT_IMPORT_CANDIDATE 只表示本地候选文件通过结构检测，不代表 Studio 已验收；贴图显示、动作播放、素材权限、尺寸和目标设备性能仍是独立门禁。'
+    note = 'DIRECT_IMPORT_CANDIDATE 只表示本地候选文件通过结构检测，不代表 Studio 已验收；贴图显示、动作播放、素材权限、尺寸和目标设备性能仍是独立门禁。'
 }
 
 $parent = Split-Path -Parent $resolvedReportPath

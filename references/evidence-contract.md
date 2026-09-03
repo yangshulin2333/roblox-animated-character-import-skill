@@ -6,6 +6,7 @@ Use this contract to prevent “works on my machine” reports. Every claim must
 
 | File / evidence | Produced by | Proves | Does not prove |
 | --- | --- | --- | --- |
+| `source_intake.json` | `intake_source.ps1` | 原始容器、分卷、标准化路径和资源生态 | 模型适用于 Roblox |
 | `preflight_report.json` or console JSON | `preflight.ps1` | source/tool discovery on this computer | asset compatibility |
 | `inspection_report.json` | Blender inspector | source geometry/rig/action facts | Studio import/playback |
 | `bundle_manifest.json` | Blender exporter | exact delivered files, actions, hashes, in-memory fixes | Roblox acceptance |
@@ -53,6 +54,8 @@ Use exactly one highest status and list lower gates separately:
 - Upload to Roblox: yes | no
 - Add to Workspace: yes | no
 - Source filename and SHA-256:
+- 原始容器类型、分卷成员和标准化路径：
+- Unity/Unreal/Blender/3ds Max 生态识别结果：
 - Source-package audit status and selected candidate:
 - Intended use: custom-rig-npc | player-replacement | avatar-r15
 - Requested gate:
