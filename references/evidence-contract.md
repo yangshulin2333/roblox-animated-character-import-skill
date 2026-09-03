@@ -66,6 +66,7 @@ Use exactly one highest status and list lower gates separately:
 - Actions and frame ranges:
 - Textures / missing files:
 - UV layers / material slots / material-linked images:
+- Source units and bounds / selected Studio Scale Unit:
 
 ## Export facts
 

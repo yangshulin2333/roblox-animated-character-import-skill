@@ -121,6 +121,10 @@ $result = [ordered]@{
     action_count = @($manifest.actions).Count
     skipped_actions = @($manifest.skipped_actions)
     texture_mode = $TextureMode
-    next_gate = 'Import model_bind.fbx into the exact Roblox Studio place, then import each action onto the same rig.'
+    next_gate = if ($AllInOne) {
+        'Try model_all_in_one.fbx in the exact Studio place first; keep model_bind.fbx plus one-action FBXs as the portable fallback.'
+    } else {
+        'Import model_bind.fbx into the exact Roblox Studio place, then import each action onto the same rig.'
+    }
 }
 $result | ConvertTo-Json -Depth 6

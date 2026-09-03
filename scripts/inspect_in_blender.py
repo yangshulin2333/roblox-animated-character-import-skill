@@ -336,6 +336,11 @@ def collect_report(source: Path | None = None) -> dict:
             / float(bpy.context.scene.render.fps_base or 1.0),
             "frame_start": int(bpy.context.scene.frame_start),
             "frame_end": int(bpy.context.scene.frame_end),
+            "units": {
+                "system": str(bpy.context.scene.unit_settings.system),
+                "scale_length": float(bpy.context.scene.unit_settings.scale_length),
+                "length_unit": str(bpy.context.scene.unit_settings.length_unit),
+            },
             "bounds": bounds,
         },
         "summary": {

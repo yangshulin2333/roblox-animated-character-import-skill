@@ -133,6 +133,8 @@ if ($candidates.Count -gt 0 -and $blender) {
                 material_images = $materialImageCount
                 maximum_positive_bone_influences = [int]$inspection.summary.maximum_positive_bone_influences
                 vertices_over_four_influences = [int]$inspection.summary.vertices_over_four_influences
+                source_bounds = $inspection.scene.bounds
+                source_units = $inspection.scene.units
             }
             report = $candidateReportPath
         }

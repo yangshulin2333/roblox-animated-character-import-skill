@@ -132,10 +132,13 @@ Inspect the actual imported data, not only filenames:
 - positive vertex influences and vertices exceeding four influences;
 - available actions, frame ranges, slots, and NLA references;
 - world-space bounds and non-finite transforms.
+- source unit system/scale and the matching Studio Importer `Scale Unit` choice.
 
 Roblox's current general limits include 20,000 triangles per individual mesh and no more than four bone influences per vertex. The root joint should be at the origin and should not influence the mesh. Avatar/R15 assets have additional requirements. See [Roblox general specifications](https://create.roblox.com/docs/art/modeling/specifications).
 
 The 20,000-triangle rule is per individual mesh. Also record whole-character triangles because import acceptance and runtime performance are different questions. Mobile/PC budgets remain project-specific and require a target-device test rather than a universal triangle number.
+
+Size is also a required report field, but it has no universal pass value. Record the source bounding box and units, select the matching Studio Importer `Scale Unit` (for example, meters for a meter-authored Blender scene), then record Studio bounds in studs. A roughly 100x mismatch usually means the Importer treated centimeter-scale FBX numbers as studs.
 
 For a textured character, structural compatibility alone is insufficient. Before export, require:
 

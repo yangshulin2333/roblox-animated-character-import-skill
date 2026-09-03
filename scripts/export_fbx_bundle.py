@@ -533,7 +533,7 @@ def main() -> int:
             "axis_up": "Y",
             "apply_scalings": "FBX Unit Scale",
             "add_leaf_bones": False,
-            "all_actions_in_one_fbx": False,
+            "all_actions_in_one_fbx": bool(args.all_in_one),
             "simplify": 0.0,
             "texture_mode": args.texture_mode,
         },
