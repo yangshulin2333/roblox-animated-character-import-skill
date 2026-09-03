@@ -2,7 +2,7 @@
 
 一个可移植的 Codex Skill，用来检查、转换、导入并实际播放验证带骨骼动画的 Roblox Custom Rig 角色。
 
-它解决的不是“某个模型在我电脑上导入成功”，而是把另一台电脑最容易漏掉的前置条件和验收门禁固定下来：Blender 版本、FBX 单动作契约、4 骨骼权重、Studio 导入队列缓存、Creator/体验归属、受限素材权限、动画真实播放、缩放后的二次播放。
+它解决的不是“某个模型在我电脑上导入成功”，而是把另一台电脑最容易漏掉的前置条件和验收门禁固定下来：Blender 版本、FBX 单动作契约、4 骨骼权重、Studio 导入队列缓存、协作者上传时的 Creator 与 Add to Workspace、每个贴图/网格依赖的体验授权、动画真实播放、缩放后的二次播放。
 
 ## 安装
 
@@ -44,6 +44,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_pipeline.ps1 `
 - 输出一个绑定模型 FBX、每个动作一个 FBX、独立贴图和 JSON 清单；
 - 检测到每顶点超过 4 根骨骼影响时停止。确认需要自动裁减时再加 `-FixMaxInfluences`；
 - 输出目录非空时停止，避免覆盖上一轮结果。
+- 在已保存/已发布的目标体验中上传时，优先依靠 **Add to Workspace** 自动授予当前体验使用权限；不会把“设置为开放使用”当成协作者项目的默认修复。
+- 禁止用 `rbxthumb://` 或单面 `Decal` 冒充完整 MeshPart 贴图；可用 `scripts/studio_audit_asset_dependencies.luau` 做只读依赖审计。
 
 ## 重要边界
 

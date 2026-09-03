@@ -49,6 +49,9 @@ Use exactly one highest status and list lower gates separately:
 - Signed-in creator:
 - Experience owner:
 - Importer Creator:
+- Target already saved/published: yes | no
+- Upload to Roblox: yes | no
+- Add to Workspace: yes | no
 - Source filename and SHA-256:
 - Intended use: custom-rig-npc | player-replacement | avatar-r15
 - Requested gate:
@@ -86,10 +89,14 @@ Use exactly one highest status and list lower gates separately:
 ## Texture and permissions
 
 - Mesh/image/animation owners:
-- Experience permission evidence:
+- Dependency audit result:
+- Automatic target-game grant evidence:
+- Manual experience permission evidence, if used:
 - Moderation state:
 - Direct `rbxassetid://` load in fresh Play:
 - Thumbnail fallback used: must be `no` for production pass
+- One-face Decal used as full-mesh fallback: must be `no`
+- Second collaborator/client visual result, when required:
 
 ## Size/performance
 

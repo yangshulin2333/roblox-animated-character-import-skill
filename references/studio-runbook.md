@@ -37,7 +37,7 @@ Recommended Custom Rig settings:
 | Import Only As Model | enabled |
 | Add to Workspace | enabled for current-place testing |
 | Upload to Roblox | disabled for local iteration; enabled only when persistent asset IDs are required |
-| Creator | the intended experience owner or an owner that can grant the experience access |
+| Creator | prefer the target experience owner/group; a collaborator's personal creator is allowed only when the automatic game grant is verified |
 | Keep Zero Influence Bones | enabled when animation hierarchy uses unweighted parents |
 | Scale Unit | `Studs` for the provided exporter contract |
 | World Forward / World Up | `Front` / `Top` for the provided exporter contract |
@@ -46,6 +46,19 @@ Recommended Custom Rig settings:
 | Uses Cage | disabled for ordinary Custom Rigs without cage meshes |
 
 The Importer supports rig, skinning, animation, and PBR data, but every warning/error must be expanded to the exact child object before continuing. Current setting meanings are documented in the [Roblox Importer](https://create.roblox.com/docs/studio/importer).
+
+### Collaborator upload and automatic permission
+
+For a game that is already saved or published, Roblox documents that **Add to Workspace** also grants the game permission to use the imported restricted asset. This is the expected path when a collaborator uploads a complete model in the target project.
+
+Before importing:
+
+1. record the signed-in account, experience owner, selected `Creator`, `Upload to Roblox`, and `Add to Workspace`;
+2. keep **Add to Workspace** enabled when the result must work in this experience;
+3. prefer the experience owner/group as `Creator` when available;
+4. if the asset is created under the collaborator's personal account, verify every generated mesh/image dependency received the target-game grant.
+
+Do not conclude that the collaborator relationship itself failed merely because the owner names differ. First determine whether the import was detached from the target game, **Add to Workspace** was disabled, a separately uploaded image missed the game grant, or a dependency remained restricted.
 
 ### Queue cache rule
 
@@ -65,11 +78,12 @@ Do not use only **Reconfigure** as proof the new file was parsed. The official I
 
 The generated `model_bind.fbx` is textureless while `textures/` and `texture_manifest.json` are separate. This isolates model/rig import from image upload.
 
-1. Import images through Asset Manager/Importer under the correct Creator.
-2. Rebuild the intended material mapping from `texture_manifest.json`.
-3. For basic color, assign the uploaded image to the MeshPart texture field expected by the imported asset.
-4. For PBR, create/assign a `SurfaceAppearance` and map Color/Normal/Roughness/Metalness channels deliberately.
-5. Check alpha mode and double-sided requirements instead of making the entire mesh transparent.
+1. Import images through the exact target experience's Asset Manager/Importer under the recorded Creator.
+2. When the target is saved/published, use the current-experience grant path; do not default to Open Use.
+3. Rebuild the intended material mapping from `texture_manifest.json`.
+4. For basic color, assign the uploaded image to the MeshPart UV texture field expected by the imported asset. Dragging an image onto a part can create a one-face `Decal`; that is not a full-mesh UV assignment.
+5. For PBR, create/assign a `SurfaceAppearance` and map Color/Normal/Roughness/Metalness channels deliberately.
+6. Check alpha mode and double-sided requirements instead of making the entire mesh transparent.
 
 ### Permission and moderation acceptance
 
@@ -79,6 +93,8 @@ After assignment, start a fresh Play session and check Output.
 - No clickable permission error may remain.
 - An asset still under moderation is `PENDING`, not `PASS`.
 - An `rbxthumb://` image is only a thumbnail and cannot satisfy texture acceptance.
+- Never write `rbxthumb://` into `MeshPart.TextureID`, `SurfaceAppearance` maps, `Decal.Texture`, or other production content fields.
+- Run `scripts/studio_audit_asset_dependencies.luau`; any thumbnail content, failed direct dependency, or suspicious one-face Decal fallback keeps the result at `TEXTURE_BLOCKED` or `PERMISSION_BLOCKED`.
 
 Roblox notes that restricted assets need explicit creator/game permission, and the game itself needs permission for script/runtime use. See [asset privacy](https://create.roblox.com/docs/projects/assets/privacy).
 
@@ -163,9 +179,12 @@ Do not claim player replacement from a Custom Rig import alone.
 ## 9. End-state checklist
 
 - [ ] Correct place and Creator recorded.
+- [ ] Saved/published target, Upload to Roblox, and Add to Workspace state recorded.
+- [ ] Collaborator upload used the target-place automatic grant path or has explicit game-grant evidence.
 - [ ] Failed queue item cleared before any changed-file retry.
 - [ ] Workspace object inspected, not only previewed.
 - [ ] Direct textures load in fresh Play; thumbnails not used as substitutes.
+- [ ] Second collaborator/client sees the same complete materials when cross-account use is required.
 - [ ] Every required action has a named local or published asset.
 - [ ] Playback start, time progress, bone change, and visual deformation checked.
 - [ ] All required actions replayed after resizing.

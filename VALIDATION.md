@@ -37,3 +37,16 @@ The test source is a privately supplied animated Custom Rig and is not included 
 - No mobile/PC performance claim was made.
 
 This record validates the local scripts and gate behavior. It is not a promise that every third-party asset or Roblox account configuration will pass.
+
+## 2026-09-03 — collaborator texture regression
+
+A live collaborative Studio place exposed a workflow defect: a failed restricted image had been hidden behind an `rbxthumb://` MeshPart texture and a one-face `Decal`. One collaborator saw a plausible preview while another saw partial and incorrectly mapped color.
+
+The new read-only `studio_audit_asset_dependencies.luau` check was run against that Workspace model and returned `DEPENDENCY_AUDIT_BLOCKED`. It detected:
+
+- a valid direct MeshId;
+- a forbidden thumbnail in `MeshPart.TextureID`;
+- a failed direct image dependency;
+- a face/projection Decal under the MeshPart.
+
+The workflow now treats a saved/published target-place import with **Add to Workspace** enabled as the primary automatic experience-grant path. It does not recommend Open Use as the default repair for a collaborative project, and it cannot pass a model that relies on a thumbnail or Decal fallback.
