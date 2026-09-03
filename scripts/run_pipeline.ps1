@@ -24,6 +24,11 @@ param(
 
     [string]$MaterialName = 'Roblox_BaseColor',
 
+    [ValidateRange(256, 4096)]
+    [int]$MaxTextureDimension = 4096,
+
+    [switch]$NoTextureToolInstall,
+
     [ValidateSet('linked', 'separate', 'embed', 'none')]
     [string]$TextureMode = 'separate'
 )
@@ -57,10 +62,12 @@ $inspectScript = Join-Path $PSScriptRoot 'inspect_in_blender.py'
 $exportScript = Join-Path $PSScriptRoot 'export_fbx_bundle.py'
 $readbackScript = Join-Path $PSScriptRoot 'readback_bundle.py'
 $validateScript = Join-Path $PSScriptRoot 'validate_bundle.py'
+$normalizeTexturesScript = Join-Path $PSScriptRoot 'normalize_roblox_textures.ps1'
 $preflightReport = Join-Path $resolvedOutput 'preflight_report.json'
 $inspectionReport = Join-Path $resolvedOutput 'inspection_report.json'
 $readbackReport = Join-Path $resolvedOutput 'readback_report.json'
 $bundleValidation = Join-Path $resolvedOutput 'bundle_validation.json'
+$textureNormalizationReport = Join-Path $resolvedOutput 'texture_normalization.json'
 
 & $preflightScript -Source $resolvedSource -BlenderPath $BlenderPath -OutputDir $resolvedOutput -ReportPath $preflightReport | Out-Null
 $preflight = Get-Content -Raw -LiteralPath $preflightReport | ConvertFrom-Json
@@ -120,6 +127,29 @@ if ($BaseColorTexture) {
 & $blender @exportArguments
 if ($LASTEXITCODE -ne 0) { throw "FBX export failed. Inspect the Blender output and $inspectionReport" }
 
+$textureNormalizationStatus = 'TEXTURE_NORMALIZATION_NOT_APPLICABLE'
+if ($TextureMode -eq 'separate') {
+    $normalizationArguments = @{
+        BundleDir = $resolvedOutput
+        ReportPath = $textureNormalizationReport
+        MaxDimension = $MaxTextureDimension
+        BlenderPath = $blender
+    }
+    if ($NoTextureToolInstall) { $normalizationArguments.NoToolInstall = $true }
+    & $normalizeTexturesScript @normalizationArguments | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "TEXTURE_COMPATIBILITY_BLOCKED: external texture normalization failed. See $textureNormalizationReport"
+    }
+    if (-not (Test-Path -LiteralPath $textureNormalizationReport -PathType Leaf)) {
+        throw "TEXTURE_COMPATIBILITY_BLOCKED: texture normalization produced no report: $textureNormalizationReport"
+    }
+    $textureNormalization = Get-Content -Raw -LiteralPath $textureNormalizationReport | ConvertFrom-Json
+    $textureNormalizationStatus = [string]$textureNormalization.status
+    if ($textureNormalizationStatus -notin @('TEXTURE_NORMALIZATION_PASS', 'TEXTURE_NORMALIZATION_SKIPPED')) {
+        throw "TEXTURE_COMPATIBILITY_BLOCKED: unexpected texture normalization status: $textureNormalizationStatus"
+    }
+}
+
 & $blender --background --factory-startup --disable-autoexec --python $readbackScript -- --bundle $resolvedOutput --report $readbackReport
 if ($LASTEXITCODE -ne 0) { throw "Fresh FBX read-back failed. See $readbackReport" }
 
@@ -135,6 +165,9 @@ $result = [ordered]@{
     action_count = @($manifest.actions).Count
     skipped_actions = @($manifest.skipped_actions)
     texture_mode = $TextureMode
+    texture_normalization_status = $textureNormalizationStatus
+    texture_normalization_report = if ($TextureMode -eq 'separate') { $textureNormalizationReport } else { $null }
+    max_texture_dimension = $MaxTextureDimension
     base_color_texture = if ($BaseColorTexture) { $resolvedBaseColorTexture } else { $null }
     formal_delivery = 'model_bind.fbx + animations/<one-action>.fbx + textures/ + manifests'
     preview_all_in_one = if ($AllInOne) { (Join-Path $resolvedOutput 'model_all_in_one.fbx') } else { $null }

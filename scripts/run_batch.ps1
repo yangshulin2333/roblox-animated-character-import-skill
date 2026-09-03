@@ -25,6 +25,11 @@ param(
 
     [string]$MaterialName = 'Roblox_BaseColor',
 
+    [ValidateRange(256, 4096)]
+    [int]$MaxTextureDimension = 4096,
+
+    [switch]$NoTextureToolInstall,
+
     [ValidateSet('linked', 'separate', 'embed', 'none')]
     [string]$TextureMode = 'separate',
 
@@ -230,6 +235,8 @@ function Get-JobOptions {
         allow_untextured = [bool]$AllowUntextured
         base_color_texture = if ($BaseColorTexture) { [System.IO.Path]::GetFullPath($BaseColorTexture) } else { $null }
         material_name = $MaterialName
+        max_texture_dimension = $MaxTextureDimension
+        no_texture_tool_install = [bool]$NoTextureToolInstall
         texture_mode = $TextureMode
     }
     if ($Config) {
@@ -248,6 +255,8 @@ function Get-JobOptions {
             if ($null -ne $override.PSObject.Properties['allow_untextured']) { $options.allow_untextured = [bool]$override.allow_untextured }
             if ($null -ne $override.PSObject.Properties['base_color_texture']) { $options.base_color_texture = Resolve-ConfigTexturePath -PathValue ([string]$override.base_color_texture) -ConfigDirectory $ConfigDirectory }
             if ($null -ne $override.PSObject.Properties['material_name']) { $options.material_name = [string]$override.material_name }
+            if ($null -ne $override.PSObject.Properties['max_texture_dimension']) { $options.max_texture_dimension = [int]$override.max_texture_dimension }
+            if ($null -ne $override.PSObject.Properties['no_texture_tool_install']) { $options.no_texture_tool_install = [bool]$override.no_texture_tool_install }
             if ($null -ne $override.PSObject.Properties['texture_mode']) { $options.texture_mode = [string]$override.texture_mode }
         }
     }
@@ -272,19 +281,21 @@ function New-StudioImportPlan {
         }
     )
     $plan = [ordered]@{
-        schema_version = '1.0'
+        schema_version = '1.1'
         status = 'READY_FOR_STUDIO'
         job_id = $JobId
         formal_contract = 'model_bind_plus_one_action_files'
         model_fbx = if ($model.Count -gt 0) { Join-Path $BundleDir ([string]$model[0].path).Replace('/', '\') } else { $null }
         texture_mode = [string]$manifest.export_settings.texture_mode
+        texture_preparation = if ($null -ne $manifest.PSObject.Properties['texture_normalization']) { $manifest.texture_normalization } else { $null }
         textures = $textures
         canary_animation = if ($animations.Count -gt 0) { Join-Path $BundleDir ([string]$animations[0].path).Replace('/', '\') } else { $null }
         remaining_animations = @($animations | Select-Object -Skip 1 | ForEach-Object { Join-Path $BundleDir ([string]$_.path).Replace('/', '\') })
         preview_all_in_one = if ($preview.Count -gt 0) { Join-Path $BundleDir ([string]$preview[0].path).Replace('/', '\') } else { $null }
         required_order_zh = @(
             '在准确的目标体验中导入 model_bind.fbx，并启用 Add to Workspace。',
-            '按 texture_manifest.json 上传或复用贴图，并检查直接 rbxassetid 加载。',
+            '只上传 texture_manifest.json 中 delivered_file 指向的 Roblox 标准化 PNG；不要上传原始贴图或历史副本。',
+            '上传后检查直接 rbxassetid 加载和当前体验权限。',
             '先导入 canary_animation，确认动作开始、时间推进、骨骼变化和形变正常。',
             '金丝雀动作通过后再导入其余单动作 FBX。',
             'model_all_in_one.fbx 若存在，只作预览，不作为跨电脑正式动画交付。'
@@ -455,12 +466,14 @@ foreach ($descriptor in $descriptors) {
             AllActions = $true
             TextureMode = [string]$options.texture_mode
             MaterialName = [string]$options.material_name
+            MaxTextureDimension = [int]$options.max_texture_dimension
         }
         if ($BlenderPath) { $pipelineArguments.BlenderPath = $BlenderPath }
         if ($options.fix_max_influences) { $pipelineArguments.FixMaxInfluences = $true }
         if ($options.include_preview_all_in_one) { $pipelineArguments.AllInOne = $true }
         if ($options.allow_untextured) { $pipelineArguments.AllowUntextured = $true }
         if ($options.base_color_texture) { $pipelineArguments.BaseColorTexture = [string]$options.base_color_texture }
+        if ($options.no_texture_tool_install) { $pipelineArguments.NoTextureToolInstall = $true }
         & $pipelineScript @pipelineArguments | Out-Null
         if ($LASTEXITCODE -ne 0) { throw "转换脚本退出码为 $LASTEXITCODE" }
 
@@ -474,7 +487,7 @@ foreach ($descriptor in $descriptors) {
         $state.bundle_validation = $validationPath
         $state.studio_import_plan = $planPath
         $state.highest_verified_gate = 'ROUNDTRIP_PASS'
-        Set-JobState -State $state -Status 'READY_FOR_STUDIO' -Stage 'STUDIO_GATE' -NextAction '按 studio_import_plan.json 在准确目标体验中导入绑定模型、贴图和一个金丝雀动作；通过后再批量导入其余动作。'
+        Set-JobState -State $state -Status 'READY_FOR_STUDIO' -Stage 'STUDIO_GATE' -NextAction '按 studio_import_plan.json 在准确目标体验中导入绑定模型，只上传已通过 TEXTURE_NORMALIZATION_PASS 的 delivered_file，再验证一个金丝雀动作；通过后再批量导入其余动作。'
         Write-Utf8Json -Value $state -Path $statePath
     } catch {
         Set-JobState -State $state -Status 'JOB_BLOCKED' -Stage 'FAILED' -NextAction '保留本次 attempt 目录和错误证据；修正明确原因后使用 -Resume，只继续未通过的任务。' -ErrorText $_.Exception.Message

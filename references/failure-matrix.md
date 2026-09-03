@@ -21,6 +21,10 @@ Read this before retrying. A retry must change a relevant condition and must not
 | Multi-action FBX behaves differently on another PC | Unsupported portability assumption | Export one animation track per FBX and import each onto the same target rig | do not use multi-action result as cross-PC evidence |
 | Model is about 100× too large/small or sideways | Units/axes | Recheck FBX Unit Scale, exporter axes, Importer Scale Unit and World Forward/Up; avoid stacking arbitrary factors | `IMPORT_BLOCKED` if orientation/scale remains unknown |
 | `base_color_texture` upload fails | Texture upload transaction | Record error, generate/use textureless FBX and separate images, remove failed queue row, add file again | `IMPORT_BLOCKED` after one changed-condition retry |
+| `.png` 本地可打开但 Studio 图片导入器拒绝 | 编码、色深、颜色模式、元数据或解析器差异 | 在上传前运行 `normalize_roblox_textures.ps1`；只上传清单中的 `*_Roblox.png`，并保留来源/输出哈希和回读报告 | 未达到 `TEXTURE_NORMALIZATION_PASS` 时为 `TEXTURE_COMPATIBILITY_BLOCKED` |
+| 贴图包含 16 位、调色板、CMYK、EXIF/ICC/XMP/iTXt、异常 CRC 或尾随数据 | 图片兼容性 | 解码后重建为 8 位 RGB/RGBA PNG，应用方向、移除非必要块、CRC 和像素回读；不得覆盖原图 | 解码或回读失败即停止，不上传原图碰运气 |
+| 标准化后的 `*_Roblox.png` 仍被 Studio 拒绝 | 上传服务、审核、限额或账号边界 | 记录精确错误、Creator、审核和队列副作用；同哈希只在条件改变后重试一次 | 不再归因为普通图片格式；按证据进入 `IMPORT_BLOCKED`/`PERMISSION_BLOCKED`/`PENDING` |
+| 自动贴图工具缺失 | 本地工具链 | 允许脚本把固定 Pillow 版本安装到用户级 CodexTools 缓存，或预装 Pillow；禁用自动安装时使用 `-NoTextureToolInstall` | `TEXTURE_TOOL_REQUIRED` |
 | 上传嵌入贴图 FBX 后出现多张同内容半成品图片 | 非原子上传/重复依赖 | 停止重试，记录已创建 ID；改用默认 `separate` 包并按 SHA-256 查 `texture_index.json` | 未查清已有云端副作用前不得再次上传 |
 | Changed FBX shows the same old error immediately | Import queue cache | Delete the individual row or Clear queue with broom, then re-add and confirm preview metadata | stop if a clean re-add still fails |
 | Mesh imports but appears white | Missing mapping, permission, or moderation | Check image upload result, material assignment, direct content load, Output, and moderation state separately | `PERMISSION_BLOCKED` or `TEXTURE_BLOCKED` |

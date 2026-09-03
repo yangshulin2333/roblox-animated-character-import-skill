@@ -7,8 +7,13 @@ import argparse
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
+import struct
 import sys
 import traceback
+import zlib
+
+
+SAFE_TEXTURE_PNG_CHUNKS = {"IHDR", "IDAT", "IEND"}
 
 
 def argv_after_separator() -> list[str]:
@@ -30,6 +35,65 @@ def safe_bundle_path(bundle: Path, relative: str) -> Path:
     candidate = (bundle / Path(*pure.parts)).resolve()
     candidate.relative_to(bundle)
     return candidate
+
+
+def inspect_upload_png(path: Path) -> dict:
+    data = path.read_bytes()
+    errors = []
+    chunks = []
+    if not data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return {"valid": False, "chunks": [], "errors": ["PNG signature is missing"]}
+    offset = 8
+    bit_depth = None
+    color_type = None
+    width = None
+    height = None
+    saw_iend = False
+    while offset + 12 <= len(data):
+        length = struct.unpack(">I", data[offset : offset + 4])[0]
+        end = offset + 12 + length
+        if end > len(data):
+            errors.append("PNG chunk exceeds file length")
+            break
+        chunk_type_bytes = data[offset + 4 : offset + 8]
+        try:
+            chunk_type = chunk_type_bytes.decode("ascii")
+        except UnicodeDecodeError:
+            chunk_type = repr(chunk_type_bytes)
+            errors.append("PNG chunk type is not ASCII")
+        payload = data[offset + 8 : offset + 8 + length]
+        expected_crc = struct.unpack(">I", data[offset + 8 + length : end])[0]
+        actual_crc = zlib.crc32(chunk_type_bytes + payload) & 0xFFFFFFFF
+        if expected_crc != actual_crc:
+            errors.append(f"CRC mismatch in {chunk_type}")
+        chunks.append(chunk_type)
+        if chunk_type == "IHDR" and length == 13:
+            width, height, bit_depth, color_type = struct.unpack(">IIBB", payload[:10])
+        if chunk_type == "IEND":
+            saw_iend = True
+            offset = end
+            break
+        offset = end
+    if not saw_iend:
+        errors.append("IEND chunk is missing")
+    if offset != len(data):
+        errors.append(f"PNG has {len(data) - offset} trailing bytes")
+    if bit_depth != 8 or color_type not in {2, 6}:
+        errors.append(
+            f"Upload PNG must be 8-bit RGB/RGBA, got bit_depth={bit_depth} color_type={color_type}"
+        )
+    unsafe = [name for name in chunks if name not in SAFE_TEXTURE_PNG_CHUNKS]
+    if unsafe:
+        errors.append("Upload PNG contains ancillary chunks: " + ", ".join(unsafe))
+    return {
+        "valid": not errors,
+        "width": width,
+        "height": height,
+        "bit_depth": bit_depth,
+        "color_type": color_type,
+        "chunks": chunks,
+        "errors": errors,
+    }
 
 
 def main() -> int:
@@ -145,6 +209,36 @@ def main() -> int:
         errors.append("Manifest does not declare the formal bind-plus-one-action runtime contract")
     elif schema_version < "1.1" and not manifest.get("target", {}).get("formal_runtime_contract"):
         warnings.append("Legacy bundle has no formal runtime contract declaration")
+
+    texture_manifest_path = bundle / "texture_manifest.json"
+    if texture_manifest_path.is_file():
+        texture_manifest = json.loads(texture_manifest_path.read_text(encoding="utf-8-sig"))
+        texture_records = [
+            item for item in texture_manifest.get("textures", []) if item.get("delivered_file")
+        ]
+        separate_mode = texture_manifest.get("texture_mode") == "separate"
+        normalization = manifest.get("texture_normalization")
+        if separate_mode and texture_records and schema_version >= "1.2":
+            if not isinstance(normalization, dict) or normalization.get("status") != "TEXTURE_NORMALIZATION_PASS":
+                errors.append("Separate texture bundle has no TEXTURE_NORMALIZATION_PASS evidence")
+            for texture in texture_records:
+                relative = texture.get("delivered_file")
+                try:
+                    texture_path = safe_bundle_path(bundle, relative)
+                except Exception as exc:
+                    errors.append(str(exc))
+                    continue
+                if not texture_path.is_file():
+                    errors.append(f"Missing normalized texture: {relative}")
+                    continue
+                png = inspect_upload_png(texture_path)
+                if not png["valid"]:
+                    errors.extend(f"{relative}: {message}" for message in png["errors"])
+                details = texture.get("normalization")
+                if not isinstance(details, dict) or details.get("status") != "TEXTURE_NORMALIZATION_PASS":
+                    errors.append(f"Texture lacks normalization evidence: {relative}")
+        elif separate_mode and texture_records:
+            warnings.append("Legacy separate texture bundle has no strict Roblox PNG normalization gate")
 
     report = {
         "schema_version": "1.0",

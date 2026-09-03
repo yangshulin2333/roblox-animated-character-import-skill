@@ -1,5 +1,19 @@
 # Validation record
 
+## 2026-09-03 — v2.1 Roblox 贴图标准化门禁
+
+针对 Studio 拒绝导入的私有蝎子基础色贴图加入上传前自动化。来源文件为 2048×2048、8 位 RGB PNG，普通解码和尺寸检查通过，但包含 `pHYs` 与 XMP `iTXt` 辅助块；没有保留 Studio 原始错误文本，因此不能把 XMP 声明为唯一根因。
+
+- 新增 `normalize_roblox_textures.ps1/.py`，支持单图和正式 `separate` 交付包；
+- 首次跨盘测试暴露 Windows `TEMP` 位于 C:、输出位于 D: 时 `os.replace()` 失败，已改为先复制到目标目录的同卷临时文件再原子替换；
+- 标准化输出 `Monster15_Color01_Roblox.png`：2048×2048、8 位 RGB，只有 `IHDR/IDAT/IEND`，无 XMP/DPI，输出 SHA-256 为 `2cf885478a6402ff66a2f8132a382253087a935cc34e10a4af783f9c4d0762a2`；
+- 重新解码的像素与原图逐字节相同，没有缩放或颜色变化；
+- 整包回归自动更新 `texture_manifest.json`、`bundle_manifest.json` 和哈希，强化后的 `validate_bundle.py` 返回 `BUNDLE_PASS`；
+- 主管线回归从原始 `Monster15_AllAnim.fbx` 导出绑定模型和 `Attack01`，自动完成贴图标准化、Blender 新进程回读及交付包校验，最终 `ROUNDTRIP_PASS`；
+- 回归输出：`D:\Work\RobloxPipelineTextureRegression_20260903_233617`；私有贴图和模型不进入仓库。
+
+本轮只证明本地编码、结构和像素门禁。修复版图片是否通过 Roblox 上传、审核、体验权限和 fresh Play 仍需要 Studio 实测，不能提前标记 `STUDIO_IMPORT_PASS`。
+
 ## 2026-09-03 — v2 批处理与外部贴图正式契约
 
 使用同一私有蝎子原始 GZIP/UnityPackage 执行 `run_batch.ps1 -Convert -FixMaxInfluences -BaseColorTexture ...`：

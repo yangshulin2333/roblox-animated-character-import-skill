@@ -2,7 +2,7 @@
 
 一个可移植的 Codex Skill。输入可以是 UnityPackage/GZIP、Unreal 工程或 UAsset 包、3ds Max、Blender、FBX、glTF、ZIP、7z、RAR 分卷以及混合资源目录；它先整理和分析原始资源，再转换、导入并实际播放验证 Roblox Custom Rig 角色。
 
-它解决的不是“某个模型在我电脑上导入成功”，而是把另一台电脑最容易漏掉的前置条件和验收门禁固定下来：Blender 版本、FBX 单动作契约、4 骨骼权重、Studio 导入队列缓存、协作者上传时的 Creator 与 Add to Workspace、每个贴图/网格依赖的体验授权、动画真实播放、缩放后的二次播放。
+它解决的不是“某个模型在我电脑上导入成功”，而是把另一台电脑最容易漏掉的前置条件和验收门禁固定下来：Blender 版本、FBX 单动作契约、4 骨骼权重、图片编码与元数据标准化、Studio 导入队列缓存、协作者上传时的 Creator 与 Add to Workspace、每个贴图/网格依赖的体验授权、动画真实播放、缩放后的二次播放。
 
 ## 安装
 
@@ -75,6 +75,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_pipeline.ps1 `
 - 不自动另存 Roblox Studio 项目；
 - 默认拒绝缺少 UV、材质槽或材质贴图引用的角色，避免再次生成白模；
 - 默认输出一个绑定模型 FBX、每个动作一个 FBX、外部贴图和 JSON 清单；
+- 正式外部贴图会自动重编码为 8 位 RGB/RGBA、无应用元数据的 `*_Roblox.png`，完成 CRC、像素回读和 SHA-256 校验；Studio 只上传 `texture_manifest.json` 的 `delivered_file`；
+- 默认最大贴图边长为 4096；需要移动端 2048/1024 时使用 `-MaxTextureDimension` 显式选择；
 - `-AllInOne` 只额外生成预览用 `model_all_in_one.fbx`，不作为跨电脑正式动画契约；
 - 检测到每顶点超过 4 根骨骼影响时停止。确认需要自动裁减时再加 `-FixMaxInfluences`；
 - 输出目录非空时停止，避免覆盖上一轮结果。
@@ -85,7 +87,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_pipeline.ps1 `
 
 这套 Skill 无法保证任意第三方模型都能 100% 导入。损坏文件、未授权资产、不可兼容骨架、Roblox 审核或账户权限都可能阻止完成。它保证的是：每一步都有可复现输入、明确状态、失败恢复路径和可核验证据，不再把“预览正常”误报为“运行正常”。
 
-原始资源规则见 [references/source-intake.md](references/source-intake.md)，批处理见 [references/batch-workflow.md](references/batch-workflow.md)，完整流程见 [references/workflow.md](references/workflow.md)，Studio 操作见 [references/studio-runbook.md](references/studio-runbook.md)。
+原始资源规则见 [references/source-intake.md](references/source-intake.md)，批处理见 [references/batch-workflow.md](references/batch-workflow.md)，贴图标准化见 [references/texture-preflight.md](references/texture-preflight.md)，完整流程见 [references/workflow.md](references/workflow.md)，Studio 操作见 [references/studio-runbook.md](references/studio-runbook.md)。
 
 脚本的真实运行记录见 [VALIDATION.md](VALIDATION.md)。
 

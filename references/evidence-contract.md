@@ -12,6 +12,7 @@ Use this contract to prevent “works on my machine” reports. Every claim must
 | `preflight_report.json` or console JSON | `preflight.ps1` | source/tool discovery on this computer | asset compatibility |
 | `inspection_report.json` | Blender inspector | source geometry/rig/action facts | Studio import/playback |
 | `bundle_manifest.json` | Blender exporter | exact delivered files, actions, hashes, in-memory fixes | Roblox acceptance |
+| `texture_normalization.json` | texture normalizer | source/output identity, decoded format, metadata removal, dimension/channel policy and pixel read-back | Studio upload, moderation or runtime permission |
 | `bundle_validation.json` | bundle validator | manifest files exist and hashes match | FBX semantics |
 | fresh Blender read-back report | Blender inspector | exported FBX can be parsed independently | Studio behavior |
 | Importer queue screenshot/log | Studio | selected file/settings/error | Workspace object/runtime |
@@ -27,6 +28,7 @@ Use exactly one highest status and list lower gates separately:
 - `PREFLIGHT_PASS`
 - `SOURCE_PASS`
 - `EXPORT_PASS`
+- `TEXTURE_NORMALIZATION_PASS`
 - `ROUNDTRIP_PASS`
 - `STUDIO_IMPORT_PASS`
 - `LOCAL_PLAYBACK_PASS`
@@ -78,6 +80,7 @@ Use exactly one highest status and list lower gates separately:
 - Model FBX:
 - Action FBXs:
 - Texture mode:
+- Texture normalization policy/report and delivered `*_Roblox.png` paths:
 - In-memory changes:
 - Fresh read-back result:
 

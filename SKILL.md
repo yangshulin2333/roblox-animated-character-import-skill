@@ -12,9 +12,10 @@ description: 接收 UnityPackage、Unreal、3ds Max、Blender、FBX、glTF、ZIP
 1. 接收压缩包、引擎工程或混合文件夹时，先读 [原始资源接收](references/source-intake.md)。
 2. 输入为多个压缩包、分卷或大量角色时，读 [批量处理、断点续跑与去重](references/batch-workflow.md)。
 3. 检测或转换前读 [完整工作流](references/workflow.md)。
-4. 涉及 Studio 导入或动画播放时，再读 [Studio 操作手册](references/studio-runbook.md)。
-5. 任何步骤失败或准备重试时，先读 [故障与恢复矩阵](references/failure-matrix.md)。
-6. 报告完成或交接到其他电脑前，读 [验收证据契约](references/evidence-contract.md)。
+4. 发现或交付任何外部图片贴图时，读 [贴图兼容性预处理](references/texture-preflight.md)。
+5. 涉及 Studio 导入或动画播放时，再读 [Studio 操作手册](references/studio-runbook.md)。
+6. 任何步骤失败或准备重试时，先读 [故障与恢复矩阵](references/failure-matrix.md)。
+7. 报告完成或交接到其他电脑前，读 [验收证据契约](references/evidence-contract.md)。
 
 ## 四阶段入口
 
@@ -42,6 +43,8 @@ description: 接收 UnityPackage、Unreal、3ds Max、Blender、FBX、glTF、ZIP
 - Unity 包若由 `Prefab -> Material -> MainTex` 保存外观、而 FBX 只有 UV，可在核验 GUID 映射后用 `-BaseColorTexture` 在临时 Blender 场景重建基础材质；不得从相似文件名盲猜贴图。
 - 同一角色包含多个 Unity Prefab/材质外观时，用 `scripts/collect_unity_appearances.ps1` 按 GUID 链生成 `appearance_manifest.json` 并复制正式外观贴图；不要为每种颜色复制一套骨架和动作 FBX。
 - 跨电脑正式交付固定使用：一个绑定模型 FBX、每个动作一个 FBX、外部贴图、`bundle_manifest.json`。默认 `TextureMode=separate`；`model_all_in_one.fbx` 只在明确要求时生成并标记为 `preview_only`。
+- `TextureMode=separate` 的全部正式贴图必须先由 `scripts/normalize_roblox_textures.ps1` 重编码为不含应用元数据的 8 位 RGB/RGBA PNG，完成 CRC、尺寸、通道、像素回读和 SHA-256 校验。`texture_manifest.json` 的 `delivered_file` 只能指向该 Roblox 上传版，不能再指向原始图片。
+- 贴图默认最大边长为 4096，符合 Roblox 当前普通纹理上限；移动端降到 2048/1024 必须作为明确质量/性能决策，不能静默降质。
 - 所有新 FBX 必须在全新 Blender 进程中重新导入回读，再进入 Studio。
 - 同一贴图只有在 SHA-256、Creator、Universe 都相同且已有 `RUNTIME_FETCH_PASS` 证据时才复用 AssetId；素材管理器可见不够。
 
@@ -49,6 +52,7 @@ description: 接收 UnityPackage、Unreal、3ds Max、Blender、FBX、glTF、ZIP
 
 - Custom Rig 与 R15/Avatar 是不同任务；不能只凭骨骼名称判断 R15。
 - 在准确的已保存/已发布体验里导入，并确认 Importer 的创建者、`添加至工作区`、体验所有者和每个网格/图片/动画依赖的权限。
+- Studio 只能上传 `studio_import_plan.json` 和 `texture_manifest.json` 指向的标准化贴图；原图即使扩展名为 `.png` 也不是交付证据。
 - 只有实际 Workspace Rig 通过 `Animator` 播放，且时间推进、骨骼变化、无加载/权限错误，才能标记 `PLAYBACK_PASS`。
 - 素材管理器可见、缩略图可见、本地 `AnimSaves` 或已有资产 ID 都不是运行时验收。
 - 动作通过后再调整大小；缩放后必须重播全部指定动作。目标设备性能必须用真实手机/电脑测量。
@@ -69,6 +73,7 @@ description: 接收 UnityPackage、Unreal、3ds Max、Blender、FBX、glTF、ZIP
 - `SOURCE_BLOCKED`：模型、骨架或指定动作缺失/损坏。
 - `SOURCE_APPEARANCE_BLOCKED`：UV、材质或图片映射不足，继续会产生白模。
 - `EXPORT_BLOCKED`：三角面、蒙皮、动作或 FBX 回读未通过。
+- `TEXTURE_COMPATIBILITY_BLOCKED`：贴图无法解码、超过配置尺寸、重编码/CRC/像素回读失败，或缺少经授权的转换工具。
 - `IMPORT_BLOCKED`：改变相关条件并重试一次后，Studio Importer 仍失败。
 - `PERMISSION_BLOCKED`：当前账号无法把依赖授权给目标体验。
 - 只有请求范围内所有门禁都有证据时才标记 `PRODUCTION_READY`。

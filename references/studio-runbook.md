@@ -78,7 +78,7 @@ Do not use only **Reconfigure** as proof the new file was parsed. The official I
 
 默认使用 `model_bind.fbx`、`textures/` 和 `texture_manifest.json`，把模型/骨架上传与图片上传拆开。这样 `base_color_texture` 上传失败时，不必再次上传网格和骨架。`model_all_in_one.fbx` 只有在清单标记 `preview_only` 时作为可选预览；它不是跨电脑正式动作交付。
 
-1. Import images through the exact target experience's Asset Manager/Importer under the recorded Creator.
+1. Confirm `texture_normalization.status == TEXTURE_NORMALIZATION_PASS`, then import only each `texture_manifest.json` `delivered_file` (normally `*_Roblox.png`) through the exact target experience's Asset Manager/Importer under the recorded Creator. Never substitute the raw source texture.
 2. When the target is saved/published, use the current-experience grant path; do not default to Open Use.
 3. Rebuild the intended material mapping from `texture_manifest.json`.
 4. For basic color, assign the uploaded image to the MeshPart UV texture field expected by the imported asset. Dragging an image onto a part can create a one-face `Decal`; that is not a full-mesh UV assignment.
@@ -95,6 +95,8 @@ After assignment, start a fresh Play session and check Output.
 - An `rbxthumb://` image is only a thumbnail and cannot satisfy texture acceptance.
 - Never write `rbxthumb://` into `MeshPart.TextureID`, `SurfaceAppearance` maps, `Decal.Texture`, or other production content fields.
 - Run `scripts/studio_audit_asset_dependencies.luau`; any thumbnail content, failed direct dependency, or suspicious one-face Decal fallback keeps the result at `TEXTURE_BLOCKED` or `PERMISSION_BLOCKED`.
+
+If Studio rejects a normalized `*_Roblox.png`, preserve the exact error and moderation state. That is no longer a generic local-format failure: classify it as upload service, moderation, account quota, Creator, or permission evidence before retrying. Do not repeatedly re-encode or upload the same normalized hash.
 
 ### TextureID is set but the mesh stays white
 

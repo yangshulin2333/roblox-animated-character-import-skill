@@ -6,6 +6,8 @@
       "fix_max_influences": true,
       "base_color_texture": "textures/character_color.png",
       "material_name": "Character_BaseColor",
+      "max_texture_dimension": 4096,
+      "no_texture_tool_install": false,
       "texture_mode": "separate",
       "include_preview_all_in_one": false,
       "allow_untextured": false

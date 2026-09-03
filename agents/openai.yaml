@@ -1,4 +1,4 @@
 interface:
   display_name: "Roblox 带动画角色导入"
-  short_description: "整理原始资源，检测、转换并验收 Roblox 动画角色"
-  default_prompt: "使用 $roblox-animated-character-import 处理这个原始角色资源：先识别和检测，给出中文报告；我选择角色后再转换，并在当前 Roblox Studio 验证贴图和动作。"
+  short_description: "检测模型与贴图，转换并验收 Roblox 动画角色"
+  default_prompt: "使用 $roblox-animated-character-import 处理这个原始角色资源：先识别和检测，给出中文报告；我选择角色后再转换，自动生成 Roblox 兼容贴图，并在当前 Roblox Studio 验证贴图和动作。"

@@ -1,6 +1,6 @@
 # 工作流：原始动画角色资源到 Roblox Studio
 
-**Version**: 2.0
+**Version**: 2.1
 **Last verified**: 2026-09-03
 **Status**: Review — scripts validated locally; each asset still requires its own Studio and permission evidence.
 
@@ -46,6 +46,7 @@ REQUESTED
        -> NATIVE_DCC_EXPORT_REQUIRED | SOURCE_BLOCKED
   -> SOURCE_PASS
   -> EXPORT_PASS          (only if conversion is needed)
+  -> TEXTURE_NORMALIZATION_PASS (when external textures are delivered)
   -> ROUNDTRIP_PASS       (only for a new export)
   -> STUDIO_IMPORT_PASS
   -> PLAYBACK_PASS        (when animation is requested)
@@ -257,6 +258,10 @@ RobloxExport/
 
 The default texture mode is `separate`: the formal cross-computer bundle keeps images under `textures/` and removes embedded image dependencies from FBX, so a failed image upload does not force another mesh/rig upload. `-AllInOne` additionally produces `model_all_in_one.fbx`, but its manifest role is `preview_only`. The binding model plus one-action FBXs are the deterministic formal contract.
 
+For `separate` mode, `run_pipeline.ps1` now automatically runs `normalize_roblox_textures.ps1` before bundle validation. Every delivered image is decoded, re-encoded as metadata-free 8-bit RGB/RGBA PNG, bounded to `-MaxTextureDimension` (4096 by default), CRC-checked, reopened, pixel-checked, renamed to `*_Roblox.png`, and recorded in `texture_normalization.json`. The source image is not modified. See [texture-preflight.md](texture-preflight.md).
+
+The formal Studio input is the `texture_manifest.json.textures[].delivered_file` path after normalization. A raw source image, historical bundle copy, or same-named file outside the bundle must not be substituted.
+
 `linked` copies images into `textures/` and preserves relative material links. `embed` is a best-effort one-file visual import and must be explicitly requested after the exact Studio target proves reliable. `none` is geometry/rig diagnosis only. The source `.blend`/`.fbx` is never saved.
 
 If inspection finds more than four influences, the wrapper stops. `-FixMaxInfluences` keeps the four strongest positive bone weights per vertex and renormalizes them in memory. This is a geometry change and requires visual joint-deformation replay before acceptance.
@@ -276,6 +281,7 @@ For each file, verify:
 - required root/parent bones remain;
 - textureless/separate mode contains no embedded image dependency that can block Studio;
 - manifest SHA-256 values match the delivered files.
+- every formal external texture has `TEXTURE_NORMALIZATION_PASS`, uses the declared `*_Roblox.png` path, contains only required PNG chunks, and passes independent pixel read-back.
 
 `scripts/validate_bundle.py` verifies file identity and bundle structure. It does not replace Blender read-back or Studio playback.
 
@@ -290,6 +296,8 @@ After import, inspect the real Workspace object:
 - orientation and bounds;
 - material/texture appearance;
 - no unresolved Importer or Output error.
+
+Upload only the normalized `delivered_file` named by `studio_import_plan.json`. If Studio rejects that file, capture the exact upload/moderation error; do not fall back to the raw source image or repeatedly create duplicate assets.
 
 If the same file path was previously in a failed queue row and the FBX changed, remove that row or use **Clear queue** before adding the file again. Reconfigure alone can reuse the failed item state.
 
