@@ -1,4 +1,4 @@
 interface:
   display_name: "Roblox Animated Character Import"
-  short_description: "Validate and import animated characters into Roblox Studio"
-  default_prompt: "Use $roblox-animated-character-import to validate and import this animated character into the current Roblox Studio place."
+  short_description: "Audit source packages, then convert and verify Roblox characters"
+  default_prompt: "Use $roblox-animated-character-import to audit this character resource first. Convert only after the compatibility report selects a source, then import and verify appearance and animation in the current Roblox Studio place."

@@ -53,6 +53,7 @@ Use exactly one highest status and list lower gates separately:
 - Upload to Roblox: yes | no
 - Add to Workspace: yes | no
 - Source filename and SHA-256:
+- Source-package audit status and selected candidate:
 - Intended use: custom-rig-npc | player-replacement | avatar-r15
 - Requested gate:
 - Highest observed status:
@@ -64,6 +65,7 @@ Use exactly one highest status and list lower gates separately:
 - Max positive influences / vertices over four:
 - Actions and frame ranges:
 - Textures / missing files:
+- UV layers / material slots / material-linked images:
 
 ## Export facts
 
@@ -94,6 +96,7 @@ Use exactly one highest status and list lower gates separately:
 - Manual experience permission evidence, if used:
 - Moderation state:
 - Direct `rbxassetid://` load in fresh Play:
+- `PreloadAsync` callback status (do not rely only on cached fetch status):
 - Thumbnail fallback used: must be `no` for production pass
 - One-face Decal used as full-mesh fallback: must be `no`
 - Second collaborator/client visual result, when required:

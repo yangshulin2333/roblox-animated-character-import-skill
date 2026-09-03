@@ -75,6 +75,7 @@ def main() -> int:
 
     model_records = [record for record in file_records if record.get("kind") == "model"]
     animation_records = [record for record in file_records if record.get("kind") == "animation"]
+    all_in_one_records = [record for record in file_records if record.get("kind") == "all_in_one"]
     declared_actions = manifest.get("actions", [])
     if len(model_records) != 1:
         errors.append(f"Expected one model FBX, found {len(model_records)}")
@@ -82,7 +83,9 @@ def main() -> int:
         errors.append(
             f"Animation record count {len(animation_records)} does not match declared actions {len(declared_actions)}"
         )
-    for record in model_records + animation_records:
+    if len(all_in_one_records) > 1:
+        errors.append(f"Expected at most one all-in-one FBX, found {len(all_in_one_records)}")
+    for record in model_records + animation_records + all_in_one_records:
         if not str(record.get("path", "")).lower().endswith(".fbx"):
             errors.append(f"Non-FBX model/animation entry: {record.get('path')}")
     if not manifest.get("target", {}).get("one_animation_track_per_fbx"):

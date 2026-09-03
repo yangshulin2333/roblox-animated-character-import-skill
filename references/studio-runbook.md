@@ -74,9 +74,9 @@ Do not use only **Reconfigure** as proof the new file was parsed. The official I
 
 ## 3. Texture path
 
-### Preferred portable path
+### Preferred visual path and fallback
 
-The generated `model_bind.fbx` is textureless while `textures/` and `texture_manifest.json` are separate. This isolates model/rig import from image upload.
+Prefer the audited embedded `model_all_in_one.fbx` or `model_bind.fbx` when it preserves UV, material, and image mapping. If Roblox rejects the embedded image transaction, use the `separate` bundle with `textures/` and `texture_manifest.json` to isolate model/rig import from image upload.
 
 1. Import images through the exact target experience's Asset Manager/Importer under the recorded Creator.
 2. When the target is saved/published, use the current-experience grant path; do not default to Open Use.
@@ -95,6 +95,19 @@ After assignment, start a fresh Play session and check Output.
 - An `rbxthumb://` image is only a thumbnail and cannot satisfy texture acceptance.
 - Never write `rbxthumb://` into `MeshPart.TextureID`, `SurfaceAppearance` maps, `Decal.Texture`, or other production content fields.
 - Run `scripts/studio_audit_asset_dependencies.luau`; any thumbnail content, failed direct dependency, or suspicious one-face Decal fallback keeps the result at `TEXTURE_BLOCKED` or `PERMISSION_BLOCKED`.
+
+### TextureID is set but the mesh stays white
+
+Do not infer the cause from the populated property. Check in this order:
+
+1. Confirm the cloud image contains non-transparent pixels and is the intended asset type.
+2. Confirm the uploaded mesh contains UVs with face-to-UV assignments.
+3. Run the dependency audit. It calls `PreloadAsync()` and records the callback result instead of trusting only an old cached `GetAssetFetchStatus()` value.
+4. If the logged-in Studio user can read the image but `MeshPart.TextureID` preloading returns `Failure`, classify it as an experience permission/binding failure. User ownership proves editor access, not runtime access by a differently owned experience.
+5. Re-import a material-linked/embedded FBX in the exact saved experience with **Upload to Roblox** and **Add to Workspace** enabled, or have the image owner grant that experience access. Do not use a thumbnail or one-face Decal.
+6. If preload succeeds but the model remains white, clear/reassign the field once, verify `MeshPart.Color` is white, inspect SurfaceAppearance overrides, and compare the mesh's actual UV data.
+
+When the FBX at the same path has changed, delete its old Importer queue row and add it again. An already-open preview can continue showing the previously parsed white version.
 
 Roblox notes that restricted assets need explicit creator/game permission, and the game itself needs permission for script/runtime use. See [asset privacy](https://create.roblox.com/docs/projects/assets/privacy).
 

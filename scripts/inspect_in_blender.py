@@ -225,7 +225,42 @@ def collect_report(source: Path | None = None) -> dict:
             "size": [float(maximum[index] - minimum[index]) for index in range(3)],
         }
 
+    used_materials = {}
+    for obj in meshes:
+        for slot in obj.material_slots:
+            if slot.material:
+                used_materials[slot.material.name_full] = slot.material
+
+    material_records = []
+    material_images = {}
+    material_image_node_count = 0
+    for material_name in sorted(used_materials):
+        material = used_materials[material_name]
+        image_nodes = []
+        if material.use_nodes and material.node_tree:
+            for node in material.node_tree.nodes:
+                if node.type == "TEX_IMAGE" and node.image:
+                    material_image_node_count += 1
+                    material_images[node.image.name_full] = node.image
+                    image_nodes.append(
+                        {
+                            "node": node.name,
+                            "image": node.image.name,
+                            "has_output_link": any(bool(output.links) for output in node.outputs),
+                        }
+                    )
+        material_records.append(
+            {
+                "name": material.name,
+                "use_nodes": bool(material.use_nodes),
+                "image_nodes": image_nodes,
+            }
+        )
+
     images = [image_record(image) for image in sorted(bpy.data.images, key=lambda item: item.name)]
+    used_images = [
+        image_record(material_images[name]) for name in sorted(material_images)
+    ]
     actions = [action_record(action) for action in sorted(bpy.data.actions, key=lambda item: item.name)]
 
     blockers = []
@@ -273,7 +308,7 @@ def collect_report(source: Path | None = None) -> dict:
                 "message": "The imported scene does not have exactly one root bone; review hierarchy manually.",
             }
         )
-    missing_images = [item["name"] for item in images if item["missing_external"]]
+    missing_images = [item["name"] for item in used_images if item["missing_external"]]
     if missing_images:
         warnings.append(
             {
@@ -308,6 +343,9 @@ def collect_report(source: Path | None = None) -> dict:
             "armature_count": len(armatures),
             "action_count": len(actions),
             "image_count": len(images),
+            "material_count": len(material_records),
+            "material_image_count": len(used_images),
+            "material_image_node_count": material_image_node_count,
             "vertices": total_vertices,
             "triangles": total_triangles,
             "maximum_positive_bone_influences": maximum_influences,
@@ -318,6 +356,8 @@ def collect_report(source: Path | None = None) -> dict:
         "armatures": armature_records,
         "actions": actions,
         "images": images,
+        "materials": material_records,
+        "material_images": used_images,
         "blockers": blockers,
         "warnings": warnings,
     }

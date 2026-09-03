@@ -22,11 +22,15 @@ $roblox-animated-character-import 把 D:\path\character.zip 导入当前 Roblox 
 
 ## 最短使用方式
 
-先只读检查环境和源文件：
+先只读审计整个资源目录；这一步不会转换模型：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\preflight.ps1 -Source "D:\path\character.fbx"
+powershell -ExecutionPolicy Bypass -File .\scripts\audit_source.ps1 `
+  -Source "D:\path\resource-folder" `
+  -IntendedUse custom-rig-npc
 ```
+
+它会识别 Unity、Unreal、3ds Max、Blender 和通用交换格式，逐个检查可读候选，并按网格、Roblox 三角面、骨架、动作、UV、材质和贴图保留情况选择真正的源文件。`*_Roblox.fbx` 这样的文件名不算通过证据。
 
 生成跨电脑交接包：
 
@@ -34,14 +38,18 @@ powershell -ExecutionPolicy Bypass -File .\scripts\preflight.ps1 -Source "D:\pat
 powershell -ExecutionPolicy Bypass -File .\scripts\run_pipeline.ps1 `
   -Source "D:\path\character.blend" `
   -OutputDir "D:\path\RobloxExport" `
-  -AllActions
+  -AllActions `
+  -FixMaxInfluences `
+  -AllInOne `
+  -TextureMode embed
 ```
 
 默认行为：
 
 - 不覆盖源文件；
 - 不自动另存 Roblox Studio 项目；
-- 输出一个绑定模型 FBX、每个动作一个 FBX、独立贴图和 JSON 清单；
+- 默认拒绝缺少 UV、材质槽或材质贴图引用的角色，避免再次生成白模；
+- 输出一个绑定模型 FBX、每个动作一个 FBX、JSON 清单，并可额外输出带嵌入贴图和全部动作的 `model_all_in_one.fbx`；
 - 检测到每顶点超过 4 根骨骼影响时停止。确认需要自动裁减时再加 `-FixMaxInfluences`；
 - 输出目录非空时停止，避免覆盖上一轮结果。
 - 在已保存/已发布的目标体验中上传时，优先依靠 **Add to Workspace** 自动授予当前体验使用权限；不会把“设置为开放使用”当成协作者项目的默认修复。

@@ -164,7 +164,7 @@ def copy_and_or_strip_textures(meshes: list, output_dir: Path, mode: str) -> tup
     materials = used_materials(meshes)
     nodes = image_nodes(materials)
     texture_dir = output_dir / "textures"
-    if mode == "separate":
+    if mode in {"linked", "separate"}:
         texture_dir.mkdir(parents=True, exist_ok=True)
 
     delivered_by_image = {}
@@ -189,7 +189,7 @@ def copy_and_or_strip_textures(meshes: list, output_dir: Path, mode: str) -> tup
             "sha256": None,
         }
 
-        if mode == "separate":
+        if mode in {"linked", "separate"}:
             suffix = packed_extension(image)
             base = portable_stem(Path(raw_basename).stem if raw_basename else image.name, "texture")
             candidate = f"{base}{suffix}"
@@ -210,6 +210,9 @@ def copy_and_or_strip_textures(meshes: list, output_dir: Path, mode: str) -> tup
             record["delivered_file"] = destination.relative_to(output_dir).as_posix()
             record["sha256"] = sha256_file(destination)
             delivered_by_image[key] = destination
+
+            if mode == "linked":
+                image.filepath = str(destination)
 
         texture_records.append(record)
 
@@ -254,7 +257,14 @@ def select_export_objects(armature, meshes: list) -> None:
     bpy.context.view_layer.objects.active = armature
 
 
-def export_fbx(path: Path, armature, meshes: list, bake_animation: bool, texture_mode: str) -> None:
+def export_fbx(
+    path: Path,
+    armature,
+    meshes: list,
+    bake_animation: bool,
+    texture_mode: str,
+    export_all_actions: bool = False,
+) -> None:
     select_export_objects(armature, meshes)
     result = bpy.ops.export_scene.fbx(
         filepath=str(path),
@@ -272,11 +282,15 @@ def export_fbx(path: Path, armature, meshes: list, bake_animation: bool, texture
         bake_anim=bake_animation,
         bake_anim_use_all_bones=True,
         bake_anim_use_nla_strips=False,
-        bake_anim_use_all_actions=False,
+        bake_anim_use_all_actions=export_all_actions,
         bake_anim_force_startend_keying=False,
         bake_anim_step=1.0,
         bake_anim_simplify_factor=0.0,
-        path_mode="COPY" if texture_mode == "embed" else "STRIP",
+        path_mode=(
+            "COPY" if texture_mode == "embed" else
+            "RELATIVE" if texture_mode == "linked" else
+            "STRIP"
+        ),
         embed_textures=texture_mode == "embed",
     )
     if "FINISHED" not in result:
@@ -355,8 +369,9 @@ def main() -> int:
     parser.add_argument("--armature")
     parser.add_argument("--action", action="append", default=[])
     parser.add_argument("--all-actions", action="store_true")
-    parser.add_argument("--texture-mode", choices=("separate", "embed", "none"), default="separate")
+    parser.add_argument("--texture-mode", choices=("linked", "separate", "embed", "none"), default="embed")
     parser.add_argument("--fix-max-influences", action="store_true")
+    parser.add_argument("--all-in-one", action="store_true")
     args = parser.parse_args(argv_after_separator())
     if args.all_actions and args.action:
         raise ValueError("Use either --all-actions or one or more --action values, not both.")
@@ -471,6 +486,24 @@ def main() -> int:
             }
         )
 
+    all_in_one_record = None
+    if args.all_in_one:
+        animation_data.action = None
+        armature.data.pose_position = "POSE"
+        bpy.context.view_layer.update()
+        all_in_one_path = output_dir / "model_all_in_one.fbx"
+        export_fbx(
+            all_in_one_path,
+            armature,
+            meshes,
+            True,
+            args.texture_mode,
+            export_all_actions=True,
+        )
+        all_in_one_record = file_record(all_in_one_path, output_dir, "all_in_one")
+        all_in_one_record["expected_action_count"] = len(actions)
+        files.append(all_in_one_record)
+
     animation_data.action = None
     armature.data.pose_position = original_pose_position
 
@@ -511,6 +544,7 @@ def main() -> int:
         },
         "root_review": root_review,
         "actions": exported_actions,
+        "all_in_one": all_in_one_record,
         "skipped_actions": skipped_actions,
         "files": files,
         "source_inspection_summary": pre_export_report["summary"],

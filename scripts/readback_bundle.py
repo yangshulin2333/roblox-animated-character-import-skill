@@ -29,7 +29,7 @@ def main() -> int:
     bundle = Path(args.bundle).expanduser().resolve()
     manifest = json.loads((bundle / "bundle_manifest.json").read_text(encoding="utf-8"))
     fbx_records = [
-        item for item in manifest.get("files", []) if item.get("kind") in {"model", "animation"}
+        item for item in manifest.get("files", []) if item.get("kind") in {"model", "animation", "all_in_one"}
     ]
     results = []
     blockers = []
@@ -51,6 +51,16 @@ def main() -> int:
                 {
                     "code": "ANIMATION_TRACK_COUNT",
                     "message": f"Animation FBX imported {action_count} actions instead of exactly one.",
+                }
+            )
+        if record["kind"] == "all_in_one" and action_count != int(record.get("expected_action_count", -1)):
+            local_errors.append(
+                {
+                    "code": "ALL_IN_ONE_ACTION_COUNT",
+                    "message": (
+                        f"All-in-one FBX imported {action_count} actions instead of "
+                        f"{record.get('expected_action_count')}."
+                    ),
                 }
             )
         results.append(

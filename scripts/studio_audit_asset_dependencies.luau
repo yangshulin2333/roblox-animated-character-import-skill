@@ -53,13 +53,20 @@ end
 local root = resolvePath(MODEL_PATH)
 assert(root and root:IsDescendantOf(workspace), "MODEL_PATH must resolve under Workspace")
 
+local preloadResults = {}
+local preloadOk, preloadError = pcall(function()
+	ContentProvider:PreloadAsync({ root }, function(contentId, status)
+		preloadResults[tostring(contentId)] = tostring(status)
+	end)
+end)
+
 local dependencies = {}
 local blockers = {}
 local warnings = {}
 
 local function addDependency(instance: Instance, propertyName: string, contentId: string)
 	local kind = classify(contentId)
-	local status = fetchStatus(contentId)
+	local status = preloadResults[contentId] or fetchStatus(contentId)
 	local item = {
 		instance = instance:GetFullName(),
 		className = instance.ClassName,
@@ -67,6 +74,7 @@ local function addDependency(instance: Instance, propertyName: string, contentId
 		contentId = contentId,
 		kind = kind,
 		fetchStatus = status,
+		preloadStatus = preloadResults[contentId],
 	}
 	table.insert(dependencies, item)
 
@@ -115,7 +123,9 @@ local report = {
 	dependencies = dependencies,
 	blockers = blockers,
 	warnings = warnings,
-	note = "Read-only audit. A pass still requires fresh-Play visual verification and Output review.",
+	preloadOk = preloadOk,
+	preloadError = if preloadOk then nil else tostring(preloadError),
+	note = "Read-only audit with a bounded preload request. A pass still requires fresh-Play visual verification and Output review; cached editor state is not cross-account evidence.",
 }
 
 local json = HttpService:JSONEncode(report)

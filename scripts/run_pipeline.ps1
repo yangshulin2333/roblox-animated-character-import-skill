@@ -16,8 +16,12 @@ param(
 
     [switch]$FixMaxInfluences,
 
-    [ValidateSet('separate', 'embed', 'none')]
-    [string]$TextureMode = 'separate'
+    [switch]$AllInOne,
+
+    [switch]$AllowUntextured,
+
+    [ValidateSet('linked', 'separate', 'embed', 'none')]
+    [string]$TextureMode = 'embed'
 )
 
 Set-StrictMode -Version Latest
@@ -73,6 +77,18 @@ if ($unresolvedBlockers.Count -gt 0) {
 if ($AllActions -and [int]$inspection.summary.action_count -eq 0) {
     throw "-AllActions was requested but the source contains no Blender Actions. See $inspectionReport"
 }
+if (-not $AllowUntextured) {
+    $missingUv = @($inspection.meshes | Where-Object { @($_.uv_layers).Count -eq 0 })
+    $missingMaterial = @($inspection.meshes | Where-Object { @($_.material_slots).Count -eq 0 })
+    $materialImageCount = if ($null -ne $inspection.summary.material_image_count) {
+        [int]$inspection.summary.material_image_count
+    } else {
+        [int]$inspection.summary.image_count
+    }
+    if ($missingUv.Count -gt 0 -or $missingMaterial.Count -gt 0 -or $materialImageCount -eq 0) {
+        throw "SOURCE_APPEARANCE_BLOCKED: the selected source does not preserve complete UV/material/image mapping. Inspect sibling DCC files before export, or pass -AllowUntextured only when a white model is intentional. See $inspectionReport"
+    }
+}
 
 $exportArguments = @(
     '--background', '--factory-startup', '--disable-autoexec',
@@ -85,6 +101,7 @@ if ($Armature) { $exportArguments += @('--armature', $Armature) }
 if ($AllActions) { $exportArguments += '--all-actions' }
 foreach ($action in $Actions) { $exportArguments += @('--action', $action) }
 if ($FixMaxInfluences) { $exportArguments += '--fix-max-influences' }
+if ($AllInOne) { $exportArguments += '--all-in-one' }
 
 & $blender @exportArguments
 if ($LASTEXITCODE -ne 0) { throw "FBX export failed. Inspect the Blender output and $inspectionReport" }
@@ -100,6 +117,7 @@ $result = [ordered]@{
     status = 'ROUNDTRIP_PASS'
     output_dir = $resolvedOutput
     model_fbx = (Join-Path $resolvedOutput 'model_bind.fbx')
+    all_in_one_fbx = if ($AllInOne) { (Join-Path $resolvedOutput 'model_all_in_one.fbx') } else { $null }
     action_count = @($manifest.actions).Count
     skipped_actions = @($manifest.skipped_actions)
     texture_mode = $TextureMode

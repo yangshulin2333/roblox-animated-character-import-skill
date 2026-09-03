@@ -50,3 +50,18 @@ The new read-only `studio_audit_asset_dependencies.luau` check was run against t
 - a face/projection Decal under the MeshPart.
 
 The workflow now treats a saved/published target-place import with **Add to Workspace** enabled as the primary automatic experience-grant path. It does not recommend Open Use as the default repair for a collaborative project, and it cannot pass a model that relies on a thumbnail or Decal fallback.
+
+## 2026-09-03 — source-selection and white-model regression
+
+The same resource directory contained a `.blend`, the original multi-action FBX, and a derived `_Roblox.fbx`. The derived FBX passed triangle and influence checks but had zero material slots and zero material-linked images. Selecting it by filename produced a structurally valid white model.
+
+The new `audit_source.ps1` compared all candidates and selected the `.blend` because it retained one UV layer, one used material, one material-linked 2048×2048 image, one armature, and 17 Actions. It reported `CONVERSION_REQUIRED` because 359 vertices exceeded four influences and Blender format still required export.
+
+After opt-in influence limiting, the pipeline generated and freshly read back an embedded `model_all_in_one.fbx` with:
+
+- 1 mesh, 1,911 vertices, and 3,786 triangles;
+- 4 maximum positive bone influences and zero vertices over four;
+- 1 UV layer, 1 material slot, and 1 embedded material-linked image;
+- 17 Actions after independent FBX read-back.
+
+The live Studio dependency audit was also strengthened to use `PreloadAsync()` callback results. For image `118366329830724`, metadata and editor-side pixel reading succeeded, but MeshPart preloading returned `AssetFetchStatus.Failure`; this is now classified as an experience permission/binding failure rather than a valid texture pass.

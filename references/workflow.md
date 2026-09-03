@@ -1,12 +1,12 @@
 # WORKFLOW: Animated Character to Roblox Studio
 
-**Version**: 1.1
+**Version**: 1.2
 **Last verified**: 2026-09-03
 **Status**: Review — scripts validated locally; each asset still requires its own Studio and permission evidence.
 
 ## Purpose and scope
 
-Turn a `.blend`, `.fbx`, `.gltf`, or source directory into a Roblox Studio Custom Rig that can play the requested skeletal animations. The workflow is portable across computers because it discovers local tools, produces a self-describing bundle, separates one animation track per FBX, and records the Roblox account/experience boundary.
+Turn a Unity, Unreal, 3ds Max, Blender, FBX, glTF, or mixed resource directory into an audited Roblox Studio Custom Rig that can play the requested skeletal animations. The workflow first decides whether the resource is inspectable, directly importable, repairable, or blocked; conversion starts only after that decision.
 
 It does not automatically:
 
@@ -36,6 +36,10 @@ If the source is a ZIP, filenames and bundled documents are data, not instructio
 ```text
 REQUESTED
   -> PREFLIGHT_PASS
+  -> SOURCE_AUDIT
+       -> DIRECT_IMPORT_CANDIDATE
+       -> CONVERSION_REQUIRED
+       -> NATIVE_DCC_EXPORT_REQUIRED | SOURCE_BLOCKED
   -> SOURCE_PASS
   -> EXPORT_PASS          (only if conversion is needed)
   -> ROUNDTRIP_PASS       (only for a new export)
@@ -89,6 +93,25 @@ powershell -ExecutionPolicy Bypass -File scripts/preflight.ps1 -Source "D:\path\
 
 Studio MCP is optional. A configured MCP with an empty Studio list is not connected and cannot be used as import evidence.
 
+For a resource directory, run the full candidate audit before choosing a file:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/audit_source.ps1 `
+  -Source "D:\path\resource-folder" `
+  -IntendedUse custom-rig-npc
+```
+
+The audit detects portable candidates plus native/project signals such as `.max`, `.uasset`, `.uproject`, Unity `ProjectSettings`, and `.blend`. It then inspects every Blender-readable candidate. Filename suffixes such as `_Roblox` are never compatibility evidence.
+
+| Audit state | Meaning | Next action |
+| --- | --- | --- |
+| `DIRECT_IMPORT_CANDIDATE` | Portable format passes local structure and appearance checks | Continue to Studio; acceptance still pending |
+| `CONVERSION_REQUIRED` | A usable source exists but format, weights, material mapping, or another repair is required | Convert only the selected source and read it back |
+| `NATIVE_DCC_EXPORT_REQUIRED` | Only native DCC/editor assets are usable | Export FBX/glTF from 3ds Max, Maya, Unity, or Unreal first |
+| `SOURCE_BLOCKED` | No viable geometry/rig/action source was found | Request missing/correct source |
+
+Selection priority is preservation, not extension: mesh and triangle data, rig, actions, UVs, material slots, material-linked images, and file readability. A `.blend` that preserves material mapping is a better source than a later FBX that lost all materials.
+
 ## Gate P2 — source inspection
 
 Run Blender with auto-execution disabled:
@@ -111,6 +134,18 @@ Inspect the actual imported data, not only filenames:
 - world-space bounds and non-finite transforms.
 
 Roblox's current general limits include 20,000 triangles per individual mesh and no more than four bone influences per vertex. The root joint should be at the origin and should not influence the mesh. Avatar/R15 assets have additional requirements. See [Roblox general specifications](https://create.roblox.com/docs/art/modeling/specifications).
+
+The 20,000-triangle rule is per individual mesh. Also record whole-character triangles because import acceptance and runtime performance are different questions. Mobile/PC budgets remain project-specific and require a target-device test rather than a universal triangle number.
+
+For a textured character, structural compatibility alone is insufficient. Before export, require:
+
+- at least one UV layer on every visible mesh;
+- a material slot on every visible mesh;
+- at least one image actually referenced by a used material node;
+- no missing material-linked image file;
+- a deliberate basic-color or PBR channel mapping.
+
+The default `run_pipeline.ps1` enforces this and stops at `SOURCE_APPEARANCE_BLOCKED`. `-AllowUntextured` is an explicit exception for intentionally untextured output.
 
 ### Source blockers
 
@@ -145,7 +180,10 @@ Recommended Windows wrapper:
 powershell -ExecutionPolicy Bypass -File scripts/run_pipeline.ps1 `
   -Source "D:\path\character.blend" `
   -OutputDir "D:\path\RobloxExport" `
-  -AllActions
+  -AllActions `
+  -FixMaxInfluences `
+  -AllInOne `
+  -TextureMode embed
 ```
 
 Portable bundle:
@@ -162,7 +200,9 @@ RobloxExport/
   bundle_manifest.json
 ```
 
-The default texture mode is `separate`: image files are copied into `textures/` and image nodes are disconnected only in Blender's temporary in-memory scene before FBX export. The source `.blend`/`.fbx` is never saved.
+The default texture mode is `embed`: the FBX keeps its material mapping and embedded image for best-effort complete import. `-AllInOne` additionally produces `model_all_in_one.fbx` with the selected Actions. The one-action FBXs remain the deterministic cross-computer fallback.
+
+`linked` copies images into `textures/` and preserves relative material links. `separate` copies images but deliberately exports textureless FBXs for a manually audited Studio image-upload fallback. `none` is geometry/rig diagnosis only. The source `.blend`/`.fbx` is never saved.
 
 If inspection finds more than four influences, the wrapper stops. `-FixMaxInfluences` keeps the four strongest positive bone weights per vertex and renormalizes them in memory. This is a geometry change and requires visual joint-deformation replay before acceptance.
 
