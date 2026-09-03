@@ -1,0 +1,58 @@
+# Roblox Animated Character Import Skill
+
+一个可移植的 Codex Skill，用来检查、转换、导入并实际播放验证带骨骼动画的 Roblox Custom Rig 角色。
+
+它解决的不是“某个模型在我电脑上导入成功”，而是把另一台电脑最容易漏掉的前置条件和验收门禁固定下来：Blender 版本、FBX 单动作契约、4 骨骼权重、Studio 导入队列缓存、Creator/体验归属、受限素材权限、动画真实播放、缩放后的二次播放。
+
+## 安装
+
+Windows PowerShell：
+
+```powershell
+git clone https://github.com/yangshulin2333/roblox-animated-character-import-skill "$env:USERPROFILE\.codex\skills\roblox-animated-character-import"
+```
+
+重启或新开 Codex 任务后使用：
+
+```text
+$roblox-animated-character-import 把 D:\path\character.zip 导入当前 Roblox Studio，优先验证全部动作；只在必要时用 Blender 修改，不另存 Studio 副本。
+```
+
+如果界面使用 `@` 选择能力，在 Skill 列表中选择 **Roblox Animated Character Import**；Skill 的稳定标识仍是 `$roblox-animated-character-import`。
+
+## 最短使用方式
+
+先只读检查环境和源文件：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\preflight.ps1 -Source "D:\path\character.fbx"
+```
+
+生成跨电脑交接包：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_pipeline.ps1 `
+  -Source "D:\path\character.blend" `
+  -OutputDir "D:\path\RobloxExport" `
+  -AllActions
+```
+
+默认行为：
+
+- 不覆盖源文件；
+- 不自动另存 Roblox Studio 项目；
+- 输出一个绑定模型 FBX、每个动作一个 FBX、独立贴图和 JSON 清单；
+- 检测到每顶点超过 4 根骨骼影响时停止。确认需要自动裁减时再加 `-FixMaxInfluences`；
+- 输出目录非空时停止，避免覆盖上一轮结果。
+
+## 重要边界
+
+这套 Skill 无法保证任意第三方模型都能 100% 导入。损坏文件、未授权资产、不可兼容骨架、Roblox 审核或账户权限都可能阻止完成。它保证的是：每一步都有可复现输入、明确状态、失败恢复路径和可核验证据，不再把“预览正常”误报为“运行正常”。
+
+完整流程见 [references/workflow.md](references/workflow.md)，Studio 操作见 [references/studio-runbook.md](references/studio-runbook.md)。
+
+脚本的真实运行记录见 [VALIDATION.md](VALIDATION.md)。
+
+## 安全与分发
+
+仓库不包含模型、贴图、Cookie、API Key、Roblox 账号信息或本机绝对路径。请确认你对导入和分发的角色资源拥有相应权利。

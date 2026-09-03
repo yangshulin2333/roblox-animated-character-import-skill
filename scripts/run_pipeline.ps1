@@ -1,0 +1,108 @@
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$Source,
+
+    [Parameter(Mandatory = $true)]
+    [string]$OutputDir,
+
+    [string]$BlenderPath,
+
+    [string]$Armature,
+
+    [string[]]$Actions = @(),
+
+    [switch]$AllActions,
+
+    [switch]$FixMaxInfluences,
+
+    [ValidateSet('separate', 'embed', 'none')]
+    [string]$TextureMode = 'separate'
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+if ($AllActions -and $Actions.Count -gt 0) {
+    throw 'Use either -AllActions or -Actions, not both.'
+}
+if (-not (Test-Path -LiteralPath $Source -PathType Leaf)) {
+    throw 'run_pipeline.ps1 requires one exact source model file. Run preflight on a directory/ZIP first.'
+}
+
+$resolvedSource = (Resolve-Path -LiteralPath $Source).Path
+$resolvedOutput = [System.IO.Path]::GetFullPath($OutputDir)
+if (Test-Path -LiteralPath $resolvedOutput) {
+    $existing = @(Get-ChildItem -LiteralPath $resolvedOutput -Force)
+    if ($existing.Count -gt 0) {
+        throw "Output directory is not empty; refusing to overwrite: $resolvedOutput"
+    }
+} else {
+    New-Item -ItemType Directory -Path $resolvedOutput | Out-Null
+}
+
+$preflightScript = Join-Path $PSScriptRoot 'preflight.ps1'
+$inspectScript = Join-Path $PSScriptRoot 'inspect_in_blender.py'
+$exportScript = Join-Path $PSScriptRoot 'export_fbx_bundle.py'
+$readbackScript = Join-Path $PSScriptRoot 'readback_bundle.py'
+$validateScript = Join-Path $PSScriptRoot 'validate_bundle.py'
+$preflightReport = Join-Path $resolvedOutput 'preflight_report.json'
+$inspectionReport = Join-Path $resolvedOutput 'inspection_report.json'
+$readbackReport = Join-Path $resolvedOutput 'readback_report.json'
+$bundleValidation = Join-Path $resolvedOutput 'bundle_validation.json'
+
+& $preflightScript -Source $resolvedSource -BlenderPath $BlenderPath -OutputDir $resolvedOutput -ReportPath $preflightReport | Out-Null
+$preflight = Get-Content -Raw -LiteralPath $preflightReport | ConvertFrom-Json
+if ($preflight.status -ne 'PREFLIGHT_PASS') { throw "Preflight failed. See $preflightReport" }
+$blender = [string]$preflight.blender.path
+if (-not $blender) { throw 'Preflight returned no Blender executable.' }
+
+& $blender --background --factory-startup --disable-autoexec --python $inspectScript -- --source $resolvedSource --report $inspectionReport
+if ($LASTEXITCODE -ne 0) { throw "Blender inspection failed. See $inspectionReport" }
+$inspection = Get-Content -Raw -LiteralPath $inspectionReport | ConvertFrom-Json
+
+$unresolvedBlockers = @()
+foreach ($blocker in @($inspection.blockers)) {
+    if ($blocker.code -eq 'MAX_INFLUENCES_EXCEEDED' -and $FixMaxInfluences) { continue }
+    $unresolvedBlockers += $blocker
+}
+if ($unresolvedBlockers.Count -gt 0) {
+    $codes = ($unresolvedBlockers | ForEach-Object { $_.code }) -join ', '
+    throw "Source has unresolved compatibility blockers: $codes. See $inspectionReport"
+}
+if ($AllActions -and [int]$inspection.summary.action_count -eq 0) {
+    throw "-AllActions was requested but the source contains no Blender Actions. See $inspectionReport"
+}
+
+$exportArguments = @(
+    '--background', '--factory-startup', '--disable-autoexec',
+    '--python', $exportScript, '--',
+    '--source', $resolvedSource,
+    '--output-dir', $resolvedOutput,
+    '--texture-mode', $TextureMode
+)
+if ($Armature) { $exportArguments += @('--armature', $Armature) }
+if ($AllActions) { $exportArguments += '--all-actions' }
+foreach ($action in $Actions) { $exportArguments += @('--action', $action) }
+if ($FixMaxInfluences) { $exportArguments += '--fix-max-influences' }
+
+& $blender @exportArguments
+if ($LASTEXITCODE -ne 0) { throw "FBX export failed. Inspect the Blender output and $inspectionReport" }
+
+& $blender --background --factory-startup --disable-autoexec --python $readbackScript -- --bundle $resolvedOutput --report $readbackReport
+if ($LASTEXITCODE -ne 0) { throw "Fresh FBX read-back failed. See $readbackReport" }
+
+& $blender --background --factory-startup --disable-autoexec --python $validateScript -- --bundle $resolvedOutput --report $bundleValidation
+if ($LASTEXITCODE -ne 0) { throw "Bundle validation failed. See $bundleValidation" }
+
+$manifest = Get-Content -Raw -LiteralPath (Join-Path $resolvedOutput 'bundle_manifest.json') | ConvertFrom-Json
+$result = [ordered]@{
+    status = 'ROUNDTRIP_PASS'
+    output_dir = $resolvedOutput
+    model_fbx = (Join-Path $resolvedOutput 'model_bind.fbx')
+    action_count = @($manifest.actions).Count
+    skipped_actions = @($manifest.skipped_actions)
+    texture_mode = $TextureMode
+    next_gate = 'Import model_bind.fbx into the exact Roblox Studio place, then import each action onto the same rig.'
+}
+$result | ConvertTo-Json -Depth 6
