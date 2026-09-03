@@ -342,7 +342,10 @@ def update_studio_import_plan(bundle: Path, texture_manifest: dict) -> str | Non
                 "status": existing.get("status", "UPLOAD_OR_REUSE_REQUIRED"),
             }
         )
-    plan["schema_version"] = "1.1"
+    # Texture repair must not downgrade newer plans that also contain animation
+    # import settings and per-action state.
+    if str(plan.get("schema_version", "1.0")) in {"", "1.0"}:
+        plan["schema_version"] = "1.1"
     plan["textures"] = textures
     plan["texture_preparation"] = {
         "status": "TEXTURE_NORMALIZATION_PASS",

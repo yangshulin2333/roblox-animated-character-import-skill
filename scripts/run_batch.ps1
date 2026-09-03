@@ -270,6 +270,22 @@ function New-StudioImportPlan {
     $model = @($manifest.files | Where-Object { $_.kind -eq 'model' } | Select-Object -First 1)
     $animations = @($manifest.files | Where-Object { $_.kind -eq 'animation' })
     $preview = @($manifest.files | Where-Object { $_.kind -eq 'all_in_one' } | Select-Object -First 1)
+    $animationQueue = @(
+        for ($index = 0; $index -lt $animations.Count; $index++) {
+            $animation = $animations[$index]
+            [pscustomobject][ordered]@{
+                order = $index + 1
+                role = if ($index -eq 0) { 'CANARY' } else { 'REMAINING' }
+                action = [string]$animation.action
+                file = Join-Path $BundleDir ([string]$animation.path).Replace('/', '\')
+                sha256 = [string]$animation.sha256
+                local_import_status = 'PENDING'
+                published_asset_id = $null
+                experience_permission_status = 'NOT_APPLICABLE_UNTIL_PUBLISHED'
+                runtime_playback_status = 'NOT_TESTED'
+            }
+        }
+    )
     $textures = @(
         foreach ($texture in @($textureManifest.textures | Where-Object { $_.delivered_file })) {
             [pscustomobject][ordered]@{
@@ -281,7 +297,7 @@ function New-StudioImportPlan {
         }
     )
     $plan = [ordered]@{
-        schema_version = '1.1'
+        schema_version = '1.2'
         status = 'READY_FOR_STUDIO'
         job_id = $JobId
         formal_contract = 'model_bind_plus_one_action_files'
@@ -291,13 +307,26 @@ function New-StudioImportPlan {
         textures = $textures
         canary_animation = if ($animations.Count -gt 0) { Join-Path $BundleDir ([string]$animations[0].path).Replace('/', '\') } else { $null }
         remaining_animations = @($animations | Select-Object -Skip 1 | ForEach-Object { Join-Path $BundleDir ([string]$_.path).Replace('/', '\') })
+        animation_import = [ordered]@{
+            rig_type = 'CUSTOM'
+            target_rig_path = $null
+            rest_pose_source = 'IMPORTED_SKELETON'
+            rest_pose_ui_zh = '导入的骨架（第二项）'
+            applicability_zh = '仅用于同一绑定骨架导出的单动作 FBX；骨架层级或休息姿势不一致时必须停止并转为重定向检查。'
+            local_import_policy = 'IMPORT_ALL_LOCALLY_THEN_PUBLISH_SELECTED'
+            automation_mode = 'GUIDED_UI_LOOP'
+            public_api_boundary_zh = 'Roblox 公开 Studio API 仍会逐个提示选择 FBX，不能把一组本地路径无交互地绑定到现有骨架；Codex 可按此队列自动执行并逐项验收。'
+            actions = $animationQueue
+        }
         preview_all_in_one = if ($preview.Count -gt 0) { Join-Path $BundleDir ([string]$preview[0].path).Replace('/', '\') } else { $null }
         required_order_zh = @(
             '在准确的目标体验中导入 model_bind.fbx，并启用 Add to Workspace。',
             '只上传 texture_manifest.json 中 delivered_file 指向的 Roblox 标准化 PNG；不要上传原始贴图或历史副本。',
             '上传后检查直接 rbxassetid 加载和当前体验权限。',
-            '先导入 canary_animation，确认动作开始、时间推进、骨骼变化和形变正常。',
-            '金丝雀动作通过后再导入其余单动作 FBX。',
+            '在动画编辑器选择目标 Custom Rig；导入设置的休息姿势来源选择第二项“导入的骨架”。',
+            '先本地导入 canary_animation，确认动作开始、时间推进、骨骼变化和形变正常。',
+            '金丝雀动作通过后按 animation_import.actions 将其余动作全部导入本地；先预览，默认只发布最终选中的动作。',
+            '每个已发布 AnimationId 都必须授权给当前 Universe，并在 fresh Play 中确认 Length 大于 0、TimePosition 推进且骨骼变化。',
             'model_all_in_one.fbx 若存在，只作预览，不作为跨电脑正式动画交付。'
         )
     }

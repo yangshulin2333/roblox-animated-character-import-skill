@@ -2,7 +2,7 @@
 
 一个可移植的 Codex Skill。输入可以是 UnityPackage/GZIP、Unreal 工程或 UAsset 包、3ds Max、Blender、FBX、glTF、ZIP、7z、RAR 分卷以及混合资源目录；它先整理和分析原始资源，再转换、导入并实际播放验证 Roblox Custom Rig 角色。
 
-它解决的不是“某个模型在我电脑上导入成功”，而是把另一台电脑最容易漏掉的前置条件和验收门禁固定下来：Blender 版本、FBX 单动作契约、4 骨骼权重、图片编码与元数据标准化、Studio 导入队列缓存、协作者上传时的 Creator 与 Add to Workspace、每个贴图/网格依赖的体验授权、动画真实播放、缩放后的二次播放。
+它解决的不是“某个模型在我电脑上导入成功”，而是把另一台电脑最容易漏掉的前置条件和验收门禁固定下来：Blender 版本、FBX 单动作契约、4 骨骼权重、图片编码与元数据标准化、Studio 导入队列缓存、同源动作的“导入的骨架”休息姿势选项、协作者上传时的 Creator 与 Add to Workspace、每个贴图/网格/动画依赖的体验授权、动画真实播放、缩放后的二次播放。
 
 ## 安装
 
@@ -68,6 +68,20 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_pipeline.ps1 `
   -AllActions `
   -FixMaxInfluences
 ```
+
+绑定模型进入 Workspace 后，为大量动作生成可续跑的 Studio 队列：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\prepare_animation_import.ps1 `
+  -StudioImportPlan "D:\本批次\角色任务\studio_import_plan.json" `
+  -TargetRigPath "Workspace.实际模型名" `
+  -UniverseId "目标UniverseId" `
+  -PlaceId "目标PlaceId" `
+  -ExperienceOwner "体验所有者" `
+  -AnimationUploader "动画上传者"
+```
+
+同一绑定骨架导出的单动作 FBX 使用 Custom Rig，并在导入设置选择第二项“导入的骨架”。默认把全部动作先导入本地试听，只发布用户最终选中的动作；每个发布后的 AnimationId 都要授权给目标 Universe，再用 fresh Play 验证。
 
 默认行为：
 

@@ -18,6 +18,7 @@ Read this before retrying. A retry must change a relevant condition and must not
 | Intended Roblox Root is weighted or far from origin | Rig | First distinguish the designated Root from a top-level deform bone; repair root influence/transform in a temporary scene | stop if animation space cannot be preserved |
 | Several top-level bones are present | Rig ambiguity | Inspect hierarchy/actions; do not auto-delete roots or merge skeletons. A weighted top-level deform bone is not automatically the designated Roblox Root | `EXPORT_REVIEW_REQUIRED` until Studio playback confirms the hierarchy |
 | Action cannot be assigned in Blender | Action slot/rest pose | Select compatible action slot or retarget explicitly; verify frame range | `EXPORT_BLOCKED` for required action |
+| 同源单动作 FBX 导入后姿势错乱或导入器要求休息姿势来源 | Studio 导入设置缺失 | 目标设为已导入的 Custom Rig，并选择第二项“导入的骨架”；若骨架层级/休息姿势并非同源则停止并重定向 | `PLAYBACK_BLOCKED`，不得盲目批量继续 |
 | Multi-action FBX behaves differently on another PC | Unsupported portability assumption | Export one animation track per FBX and import each onto the same target rig | do not use multi-action result as cross-PC evidence |
 | Model is about 100× too large/small or sideways | Units/axes | Recheck FBX Unit Scale, exporter axes, Importer Scale Unit and World Forward/Up; avoid stacking arbitrary factors | `IMPORT_BLOCKED` if orientation/scale remains unknown |
 | `base_color_texture` upload fails | Texture upload transaction | Record error, generate/use textureless FBX and separate images, remove failed queue row, add file again | `IMPORT_BLOCKED` after one changed-condition retry |
@@ -39,6 +40,7 @@ Read this before retrying. A retry must change a relevant condition and must not
 | Importer Creator differs from experience owner | Ownership boundary, not automatic failure | Prefer the intended owner/group; for collaborator-personal uploads, verify Add to Workspace auto-granted the target game before runtime claim | stop only if direct dependency fetch still fails |
 | Imported model has `AnimSaves` but Play does nothing | Missing runtime setup | Add/find `AnimationController` + server-created `Animator`; locally register sequences only for preview | `PLAYBACK_BLOCKED` |
 | Track loads but `Length == 0` | Asset not ready, wrong ID, or permission | bounded wait, inspect Output, verify ID/owner/game access | stop after timeout; do not spin indefinitely |
+| 动画发布成功，但 fresh Play 报“体验没有访问权限”且 `Length == 0` | 动画上传者与体验所有者不同，目标 Universe 未获授权 | 点击 Output 的权限错误，Quick Share 到准确体验；fresh Play 复验。不要重新导出、重新上传或把 Animator 当作权限修复 | `PERMISSION_BLOCKED`，直到素材所有者完成授权 |
 | `IsPlaying` true but no bone changes | Wrong rig/action mapping | Compare pose names/hierarchy, target rig, animation source, and expected moving bones | `PLAYBACK_BLOCKED` |
 | Track plays once but loop jumps | Source or conversion seam | Compare first/last poses and root translation; repair only if seamless loop is required | action pass may be non-looping only if user accepts |
 | Model scaled and root motion becomes wrong | Post-scale animation | replay all actions; inspect translation keys, attachments, feet, and collision | `SCALE_BLOCKED` |

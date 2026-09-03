@@ -123,14 +123,20 @@ For each action:
 
 1. select the imported target rig;
 2. open Animation Editor and choose that rig;
-3. import the matching FBX animation onto the same skeleton;
-4. confirm frame range, pose, root motion, and loop setting;
-5. save locally for preview;
-6. publish only when persistent runtime use is requested;
-7. choose the same intended owner as the experience when possible, otherwise grant collaborator and experience access;
-8. record the resulting animation ID.
+3. set rig type to Custom;
+4. for a one-action FBX generated from the same bind skeleton, set rest-pose source to the second option **“导入的骨架”**; do not use this rule for unrelated or retargeted skeletons;
+5. import the matching FBX animation onto the same skeleton;
+6. confirm frame range, pose, root motion, and loop setting;
+7. save locally for preview;
+8. publish only when persistent runtime use is requested;
+9. choose the same intended owner as the experience when possible, otherwise grant the target experience access immediately after publishing;
+10. record the resulting animation ID, owner, Universe permission, and fresh-Play result.
+
+For a bundle with many actions, run `scripts/prepare_animation_import.ps1` after the target model exists in Workspace. The default queue policy is: import every action locally, preview and shortlist, then publish only the selected actions. Roblox's public [`Plugin:ImportFbxAnimationAsync()`](https://create.roblox.com/docs/reference/engine/classes/Plugin#ImportFbxAnimationAsync) still opens an import prompt and does not accept a supplied file path, so a reliable batch uses a guided Studio UI loop and verifies every imported action instead of claiming a headless one-call import.
 
 If the action cannot be imported onto the rig, return to Blender and compare bone hierarchy, rest pose, action slots, and coordinate space. Matching names alone are insufficient.
+
+If a published animation produces `Length == 0` and Output says the experience lacks access, do not re-export or re-upload. Use the clickable Output error/Quick Share dialog, choose the exact target experience, grant access, start a fresh Play session, and retest. An `Animator` already present on the server does not repair a missing asset grant.
 
 ## 5. Local sequence playback
 

@@ -19,6 +19,7 @@ Use this contract to prevent “works on my machine” reports. Every claim must
 | Workspace tree + bounds | Studio | actual object created | animation works |
 | local playback report | Studio | temporary sequence drives the rig | published/runtime permission |
 | published playback report | fresh Play session | asset ID loads and animates in target experience | mobile performance |
+| `studio_import_plan.json.animation_import` | batch + Studio preparation | target Custom Rig, rest-pose choice, ordered action hashes, local/publish/permission status | visual correctness or runtime permission until separately tested |
 | device profiling record | target client | measured performance under stated load | every other device/configuration |
 
 ## Required statuses
@@ -55,6 +56,10 @@ Use exactly one highest status and list lower gates separately:
 - Experience owner:
 - Importer Creator:
 - Target already saved/published: yes | no
+- Animation target rig path:
+- Animation rest-pose source: `IMPORTED_SKELETON` | retarget review required
+- Animation uploader and experience owner:
+- Target Universe ID:
 - Upload to Roblox: yes | no
 - Add to Workspace: yes | no
 - Source filename and SHA-256:

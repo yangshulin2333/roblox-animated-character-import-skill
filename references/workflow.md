@@ -305,7 +305,7 @@ For a saved or published target experience, keep **Add to Workspace** enabled on
 
 ## Gate P7 — animation import and playback
 
-Roblox documents one animation track per FBX. Import each action file onto the same target rig through Animation Editor. A multi-action FBX may be used only when it has passed on the exact target Studio version; it is not the cross-computer contract.
+Roblox documents one animation track per FBX. Import each action file onto the same target rig through Animation Editor. For one-action FBXs generated from the same bind skeleton, choose Custom Rig and the second rest-pose source, **“导入的骨架”**. Do not reuse this setting blindly for unrelated or retargeted skeletons. A multi-action FBX may be used only when it has passed on the exact target Studio version; it is not the cross-computer contract.
 
 For every required action:
 
@@ -318,9 +318,11 @@ For every required action:
 7. visually check deformation, root motion, foot sliding, and loop seam;
 8. stop the track and reset before the next action.
 
-批量任务先只导入 `studio_import_plan.json` 指定的 `canary_animation`。它和贴图依赖通过后，再导入剩余动作；失败时只恢复当前任务，不重跑已经通过的角色。
+批量任务先只本地导入 `studio_import_plan.json` 指定的 `canary_animation`。它和贴图依赖通过后，按 `animation_import.actions` 把剩余动作全部导入本地试听；默认只发布用户选中的动作。失败时只恢复当前动作/任务，不重跑已经通过的角色。
 
 Local `AnimSaves` and temporary keyframe hashes prove Studio-local preview only. Runtime reuse requires published animation IDs with valid owner/game permissions.
+
+Roblox's public Studio animation-import method still prompts for a file and does not accept a prepared file path. Therefore “batch import” means a guided, observable UI loop with one action checked at a time, not a headless one-call import. After every publish, grant the resulting AnimationId to the target Universe before fresh-Play validation.
 
 ## Gate P8 — textures, ownership, and permissions
 

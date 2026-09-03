@@ -28,7 +28,7 @@
 - 重新打包后的离线 ZIP 可安装到空目录，Skill 快速校验通过；其中 7 个 PowerShell 脚本均使用 UTF-8 BOM，并在 Windows PowerShell 5.1 解析为 0 错误；离线安装副本实际执行 `run_batch.ps1 -PlanOnly` 返回 `BATCH_PLANNED`；
 - 本轮没有再次上传 Roblox 云端素材，也没有保存/另存 Studio 项目，因此没有新增 `STUDIO_IMPORT_PASS` 或运行时权限结论。
 
-回归输出位于本机 `D:\Work\RobloxBatchV2_Scorpion_20260903_205227`；私有模型不进入仓库。
+回归输出保留在私有本机任务目录；本机路径和私有模型不进入仓库。
 
 ## 2026-09-03 — 原始 UnityPackage 与 RAR5 分卷入口
 
@@ -116,3 +116,15 @@ After opt-in influence limiting, the pipeline generated and freshly read back an
 - 17 Actions after independent FBX read-back.
 
 The live Studio dependency audit was also strengthened to use `PreloadAsync()` callback results. For image `118366329830724`, metadata and editor-side pixel reading succeeded, but MeshPart preloading returned `AssetFetchStatus.Failure`; this is now classified as an experience permission/binding failure rather than a valid texture pass.
+
+## 2026-09-04 — same-rig animation import and permission regression
+
+The portable scorpion bundle was tested again in the live `MAX模型` experience.
+
+- The target `Workspace.Scorchfang_V2` contained 81 Bones, one skinned MeshPart, one `AnimationController`, and a server-visible `Animator`.
+- The bind mesh and normalized texture dependencies both returned successful preload results.
+- A one-action FBX reached the Animation Editor timeline only after the Custom Rig import settings used the second rest-pose option, **“导入的骨架”**. This is now an explicit same-bind-skeleton requirement in the generated import plan.
+- The canary animation was published under a collaborator's personal creator, while the target Universe belonged to a different user. Concrete account and asset identifiers remain only in the private job plan and are not included in this public repository.
+- Fresh Play returned an experience-access error for that animation; the track length remained zero and no animation played.
+
+Result: mesh and texture gates passed, and the local import mapping was identified. Runtime animation remains `PERMISSION_BLOCKED` until the published AnimationId is granted to the exact target Universe and a new Play session proves positive length, advancing time, and Bone changes. The presence of an `Animator` is not evidence of asset permission.
