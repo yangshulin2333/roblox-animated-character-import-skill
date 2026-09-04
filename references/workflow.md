@@ -1,12 +1,12 @@
-# 工作流：原始动画角色资源到 Roblox Studio
+# 工作流：原始动画模型资源到 Roblox Studio
 
-**Version**: 2.3
+**Version**: 2.4
 **Last verified**: 2026-09-04
 **Status**: Review — scripts validated locally; each asset still requires its own Studio and permission evidence.
 
 ## Purpose and scope
 
-把 UnityPackage/GZIP、Unreal、3ds Max、Blender、FBX、glTF、ZIP、7z、RAR 分卷或混合资源目录，转换成经过审计并能在 Roblox Studio 播放指定骨骼动画的 Custom Rig。对外只有一次调用，内部必须依次通过：原始资源接收、内容审计、转换回读、Studio 验收。
+把 UnityPackage/GZIP、Unreal、3ds Max、Blender、FBX、glTF、ZIP、7z、RAR 分卷或混合资源目录，先按结构识别为骨骼动画、非骨架动画或静态模型。骨骼动画继续转换成经过审计并能在 Roblox Studio 播放指定动作的自定义动画模型；其余结构进入明确的烘焙、Roblox 关节重建或静态导入分流。对外只有一次调用，内部依次通过：原始资源接收、内容审计、必要转换回读、Studio 验收。
 
 It does not automatically:
 
@@ -21,7 +21,7 @@ It does not automatically:
 | Field | Required | Meaning |
 | --- | --- | --- |
 | `source` | yes | Absolute path to source file or directory |
-| `intended_use` | yes | `custom-rig-npc`, `player-replacement`, or `avatar-r15` |
+| `intended_use` | yes | 默认 `animated-model`；已知为 NPC、自定义玩家或 R15 时可用 `custom-rig-npc`、`player-replacement`、`avatar-r15` |
 | `requested_gate` | yes | `inspect`, `export`, `import`, `playback`, or `performance` |
 | `required_actions` | for playback | Action names, or `all` |
 | `target_place` | for Studio work | The exact open Studio place |
@@ -43,6 +43,8 @@ REQUESTED
   -> SOURCE_AUDIT
        -> DIRECT_IMPORT_CANDIDATE
        -> CONVERSION_REQUIRED
+       -> ANIMATION_BAKE_REQUIRED | ANIMATION_DATA_MISSING
+       -> STATIC_MODEL_CANDIDATE
        -> NATIVE_DCC_EXPORT_REQUIRED | SOURCE_BLOCKED
   -> SOURCE_PASS
   -> EXPORT_PASS          (only if conversion is needed)
@@ -125,7 +127,7 @@ Studio MCP is optional. A configured MCP with an empty Studio list is not connec
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/audit_source.ps1 `
   -Source "D:\path\resource-folder" `
-  -IntendedUse custom-rig-npc
+  -IntendedUse animated-model
 ```
 
 The audit detects portable candidates plus native/project signals such as `.max`, `.uasset`, `.uproject`, Unity `ProjectSettings`, and `.blend`. It then inspects every Blender-readable candidate. Filename suffixes such as `_Roblox` are never compatibility evidence.
@@ -163,11 +165,11 @@ Inspect the actual imported data, not only filenames:
 
 Roblox's current general limits include 20,000 triangles per individual mesh and no more than four bone influences per vertex. The root joint should be at the origin and should not influence the mesh. Avatar/R15 assets have additional requirements. See [Roblox general specifications](https://create.roblox.com/docs/art/modeling/specifications).
 
-The 20,000-triangle rule is per individual mesh. Also record whole-character triangles because import acceptance and runtime performance are different questions. Mobile/PC budgets remain project-specific and require a target-device test rather than a universal triangle number.
+The 20,000-triangle rule is per individual mesh. Also record whole-model triangles because import acceptance and runtime performance are different questions. Mobile/PC budgets remain project-specific and require a target-device test rather than a universal triangle number.
 
 Size is also a required report field, but it has no universal pass value. Record the source bounding box and units, select the matching Studio Importer `Scale Unit` (for example, meters for a meter-authored Blender scene), then record Studio bounds in studs. A roughly 100x mismatch usually means the Importer treated centimeter-scale FBX numbers as studs.
 
-For a textured character, structural compatibility alone is insufficient. Before export, require:
+For a textured model, structural compatibility alone is insufficient. Before export, require:
 
 - at least one UV layer on every visible mesh;
 - a material slot on every visible mesh;
@@ -179,7 +181,7 @@ The default `run_pipeline.ps1` enforces this and stops at `SOURCE_APPEARANCE_BLO
 
 ### Source blockers
 
-- no renderable mesh or armature;
+- no renderable mesh; or an animation request without a usable armature/action route;
 - corrupt file or importer exception;
 - required action absent;
 - non-finite transforms;
@@ -228,7 +230,7 @@ powershell -ExecutionPolicy Bypass -File scripts/run_pipeline.ps1 `
 该参数只在临时 Blender 场景中重建基础材质，不修改或保存原始 FBX。若外观依赖多张
 PBR 贴图、透明通道或特殊 Shader，仍需单独建立明确的通道映射，不能用单张基础色冒充完整材质。
 
-同一 Unity 角色带多个 Prefab/材质皮肤时，可在转换输出目录中追加外观包：
+同一 Unity 模型带多个 Prefab/材质皮肤时，可在转换输出目录中追加外观包：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/collect_unity_appearances.ps1 `
@@ -318,7 +320,7 @@ For every required action:
 7. visually check deformation, root motion, foot sliding, and loop seam;
 8. stop the track and reset before the next action.
 
-批量任务先只本地导入 `studio_import_plan.json` 指定的 `canary_animation`。它和贴图依赖通过后，按 `animation_import.actions` 把剩余动作全部导入本地试听；默认只发布用户选中的动作。失败时只恢复当前动作/任务，不重跑已经通过的角色。
+批量任务先只本地导入 `studio_import_plan.json` 指定的 `canary_animation`。它和贴图依赖通过后，按 `animation_import.actions` 把剩余动作全部导入本地试听；默认只发布用户选中的动作。失败时只恢复当前动作/任务，不重跑已经通过的模型。
 
 Local `AnimSaves` and temporary keyframe hashes prove Studio-local preview only. Runtime reuse requires published animation IDs with valid owner/game permissions.
 

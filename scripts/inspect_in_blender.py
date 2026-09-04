@@ -387,6 +387,7 @@ def main() -> int:
     load_source(source)
     report = collect_report(source)
     write_json(report_path, report)
+    # Keep the historical marker stable for existing wrappers; the report now carries asset_kind.
     print("ROBLOX_CHARACTER_INSPECTION_OK", json.dumps(report["summary"], ensure_ascii=False))
     return 0
 

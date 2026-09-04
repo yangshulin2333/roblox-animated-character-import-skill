@@ -1,16 +1,16 @@
 ---
 name: roblox-animated-character-import
-description: 接收 UnityPackage、Unreal、3ds Max、Blender、FBX、glTF、ZIP、GZIP、7z 或 RAR 分卷等原始动画角色资源，先识别和审计，再转换、导入并在 Roblox Studio 验证。适用于原始资源整理、三角面/骨架/贴图检测、跨电脑交接、白模、动作播放和尺寸问题；不用于普通静态道具或自动 R15 重定向。
+description: 接收 UnityPackage、Unreal、3ds Max、Blender、FBX、glTF、ZIP、GZIP、7z 或 RAR 分卷等人物、动物、僵尸、怪物、机械或车辆模型资源，先按实际结构识别静态、骨骼动画或非骨架动画，再审计、转换、导入并在 Roblox Studio 验证。适用于三角面、骨架、动作、贴图、白模、权限、尺寸和跨电脑交接问题；不用于把任意静态道具强行做成动画，也不自动执行 R15 重定向。
 ---
 
-# Roblox 带动画角色导入
+# Roblox 动画模型导入
 
 对外只提供一个入口，内部依次执行：原始资源接收、内容审计、Roblox 转换、Studio 验收。严格保留原文件；除非用户明确要求，不新建体验、不另存 Studio 副本、不发布体验、不上传无关素材，也不重复导入已有模型。
 
 ## 必须读取的说明
 
 1. 接收压缩包、引擎工程或混合文件夹时，先读 [原始资源接收](references/source-intake.md)。
-2. 输入为多个压缩包、分卷或大量角色时，读 [批量处理、断点续跑与去重](references/batch-workflow.md)。
+2. 输入为多个压缩包、分卷或大量模型时，读 [批量处理、断点续跑与去重](references/batch-workflow.md)。
 3. 检测或转换前读 [完整工作流](references/workflow.md)。
 4. 发现或交付任何外部图片贴图时，读 [贴图兼容性预处理](references/texture-preflight.md)。
 5. 涉及 Studio 导入或动画播放时，再读 [Studio 操作手册](references/studio-runbook.md)。
@@ -30,19 +30,23 @@ description: 接收 UnityPackage、Unreal、3ds Max、Blender、FBX、glTF、ZIP
 ### 2. 内容与 Roblox 适用性审计
 
 - 运行 `scripts/audit_source.ps1`；它会先调用原始资源接收器，再检查所有 Blender 可读候选。
-- 逐个记录单 Mesh 三角面、角色总三角面、骨架、蒙皮影响数、动作、UV、材质槽和材质实际引用的图片。
-- 不得因为文件名带 `_Roblox` 就认定可用。只有审计返回 `DIRECT_IMPORT_CANDIDATE` 或 `CONVERSION_REQUIRED`，并给出选中源和修复清单后，才能继续。
-- 若同一包包含多个角色或多个独立资源组，先给中文对比表，由用户选择要转换的角色。
+- 逐个记录单 Mesh 三角面、模型总三角面、骨架、蒙皮影响数、动作、UV、材质槽和材质实际引用的图片。
+- 先按结构写入 `asset_kind`：`BONE_ANIMATED_MODEL`、`RIGGED_MODEL_WITHOUT_ACTIONS`、`NON_ARMATURE_ANIMATION_REVIEW_REQUIRED`、`STATIC_MODEL_CANDIDATE` 或 `NO_MODEL`。分类不依赖它看起来像人、动物、僵尸、怪物还是车辆。
+- `BONE_ANIMATED_MODEL` 只证明本地文件同时存在网格、骨架和动作数据；动作是否真正驱动目标骨架，仍须通过导出回读和 Studio 试播验证。
+- 不得因为文件名带 `_Roblox` 就认定可用。只有审计返回 `DIRECT_IMPORT_CANDIDATE` 或 `CONVERSION_REQUIRED`，并给出选中源和修复清单后，才能继续动画模型管线。
+- `NON_ARMATURE_ANIMATION_REVIEW_REQUIRED` 可能来自车辆/机械的对象关键帧、约束、驱动器或引擎控制器；先确认后再选择在 DCC 烘焙到骨骼，或在 Roblox 用 `Motor6D`、`HingeConstraint` 等重建，不能谎报为可直接动画导入。
+- `STATIC_MODEL_CANDIDATE` 只表示当前没有可用动画结构：静态用途转入静态模型流程，需要运动则先补足动画实现。不要为通过门禁而伪造骨架或动作。
+- 若同一包包含多个模型或多个独立资源组，先给中文对比表，由用户选择要转换的对象。
 - Unity/Unreal Shader、粒子和 VFX 不能假定可直接转换；分别报告“模型/动画可转换”和“特效需在 Roblox 重做”。
 - 审计后先给用户下方的中文资源卡，说明可直接尝试、需修复后尝试或当前无法处理。若用户只要求检测，到此停止；已要求导入且修复在授权范围内时继续，不让用户逐项批准常规技术设置。
 
 ### 3. 转换与便携交付
 
-- Roblox 当前通用几何门禁按**每个独立 Mesh 最多 20,000 个三角面**判断；同时记录角色总三角面，但不能用总面数直接承诺移动端性能。
+- Roblox 当前通用几何门禁按**每个独立 Mesh 最多 20,000 个三角面**判断；同时记录模型总三角面，但不能用总面数直接承诺移动端性能。
 - 动画网格任何顶点超过四个正骨骼影响时阻止导出，除非用户允许临时截断并在动作中复验形变。
 - 完整外观必须同时具备 UV、材质槽和材质实际引用的图片；缺失时停止在 `SOURCE_APPEARANCE_BLOCKED`，不得静默交付白模。
 - Unity 包若由 `Prefab -> Material -> MainTex` 保存外观、而 FBX 只有 UV，可在核验 GUID 映射后用 `-BaseColorTexture` 在临时 Blender 场景重建基础材质；不得从相似文件名盲猜贴图。
-- 同一角色包含多个 Unity Prefab/材质外观时，用 `scripts/collect_unity_appearances.ps1` 按 GUID 链生成 `appearance_manifest.json` 并复制正式外观贴图；不要为每种颜色复制一套骨架和动作 FBX。
+- 同一模型包含多个 Unity Prefab/材质外观时，用 `scripts/collect_unity_appearances.ps1` 按 GUID 链生成 `appearance_manifest.json` 并复制正式外观贴图；不要为每种颜色复制一套骨架和动作 FBX。
 - 跨电脑正式交付固定使用：一个绑定模型 FBX、每个动作一个 FBX、外部贴图、`bundle_manifest.json`。默认 `TextureMode=separate`；`model_all_in_one.fbx` 只在明确要求时生成并标记为 `preview_only`。
 - `TextureMode=separate` 的全部正式贴图必须先由 `scripts/normalize_roblox_textures.ps1` 重编码为不含应用元数据的 8 位 RGB/RGBA PNG，完成 CRC、尺寸、通道、像素回读和 SHA-256 校验。`texture_manifest.json` 的 `delivered_file` 只能指向该 Roblox 上传版，不能再指向原始图片。
 - 贴图默认最大边长为 4096，符合 Roblox 当前普通纹理上限；移动端降到 2048/1024 必须作为明确质量/性能决策，不能静默降质。
@@ -51,7 +55,7 @@ description: 接收 UnityPackage、Unreal、3ds Max、Blender、FBX、glTF、ZIP
 
 ### 4. Roblox Studio 验收
 
-- Custom Rig 与 R15/Avatar 是不同任务；不能只凭骨骼名称判断 R15。
+- 骨骼驱动的自定义模型与 R15/Avatar 是不同任务；人形外观也不能只凭骨骼名称判断 R15。动物、怪物和骨骼驱动车辆默认按自定义动画模型处理。
 - 在准确的已保存/已发布体验里导入，并确认 Importer 的创建者、`添加至工作区`、体验所有者和每个网格/图片/动画依赖的权限。
 - Studio 只能上传 `studio_import_plan.json` 和 `texture_manifest.json` 指向的标准化贴图；原图即使扩展名为 `.png` 也不是交付证据。
 - 只有实际 Workspace Rig 通过 `Animator` 播放，且时间推进、骨骼变化、无加载/权限错误，才能标记 `PLAYBACK_PASS`。
@@ -77,8 +81,9 @@ description: 接收 UnityPackage、Unreal、3ds Max、Blender、FBX、glTF、ZIP
 
 | 内容 | 要说明什么 |
 | --- | --- |
-| 原始包包含什么 | 实际格式、角色数、外观/配色、动作；特效和非模型资料另列，不把图片总数当皮肤数 |
-| 三角面 | 原始与最终角色总量、最大单 Mesh、网格数；标明数据来自本地回读还是 Studio，不能把 Blender 四边面当三角面 |
+| 原始包包含什么 | 实际格式、模型/资源组数量、外观/配色、动作；特效和非模型资料另列，不把图片总数当皮肤数 |
+| 模型结构分类 | 骨骼动画、只有骨架无动作、非骨架动画、静态模型或无模型；说明判断依据和对应路线 |
+| 三角面 | 原始与最终模型总量、最大单 Mesh、网格数；标明数据来自本地回读还是 Studio，不能把 Blender 四边面当三角面 |
 | 骨架与动画 | 骨骼数、每顶点影响数、动作名/数量，原地或位移动作；哪些已试播 |
 | 贴图与尺寸 | 本次外观、贴图数量/分辨率/文件大小、映射缺失；原单位/包围盒与 Studio studs 分开 |
 | 适用性判断 | 导入兼容性、玩法适用性、设备性能分开；NPC 可用不等于默认玩家角色或移动端性能已通过 |
@@ -93,7 +98,10 @@ description: 接收 UnityPackage、Unreal、3ds Max、Blender、FBX、glTF、ZIP
 - `SOURCE_SELECTION_REQUIRED`：目录内有多个独立原始资源组，需要用户先选。
 - `EXTRACTOR_REQUIRED`：本机缺少能读取该格式/版本的解包工具。
 - `NATIVE_DCC_EXPORT_REQUIRED`：只有 `.max`、`.uasset` 等原生资产，必须从对应软件导出。
-- `SOURCE_BLOCKED`：模型、骨架或指定动作缺失/损坏。
+- `ANIMATION_BAKE_REQUIRED`：存在非骨架动作，必须先烘焙到骨骼或确定 Roblox 运行时关节方案。
+- `ANIMATION_DATA_MISSING`：模型有骨架但缺少可导出的动作。
+- `STATIC_MODEL_CANDIDATE`：模型可作为静态资源继续评估，但不满足当前动画模型管线。
+- `SOURCE_BLOCKED`：模型或必需数据缺失/损坏。
 - `SOURCE_APPEARANCE_BLOCKED`：UV、材质或图片映射不足，继续会产生白模。
 - `EXPORT_BLOCKED`：三角面、蒙皮、动作或 FBX 回读未通过。
 - `TEXTURE_COMPATIBILITY_BLOCKED`：贴图无法解码、超过配置尺寸、重编码/CRC/像素回读失败，或缺少经授权的转换工具。

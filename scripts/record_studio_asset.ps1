@@ -43,7 +43,7 @@ if ($Sha256 -notmatch '^[0-9a-f]{64}$') { throw "无效 SHA-256：$Sha256" }
 $resolvedRegistry = [System.IO.Path]::GetFullPath($RegistryPath)
 $entries = New-Object System.Collections.Generic.List[object]
 if (Test-Path -LiteralPath $resolvedRegistry -PathType Leaf) {
-    $existing = Get-Content -Raw -LiteralPath $resolvedRegistry | ConvertFrom-Json
+    $existing = Get-Content -Raw -Encoding UTF8 -LiteralPath $resolvedRegistry | ConvertFrom-Json
     foreach ($entry in @($existing.entries)) { $entries.Add($entry) }
 }
 
@@ -86,4 +86,3 @@ $json = $result | ConvertTo-Json -Depth 10
 [System.IO.File]::WriteAllText($temporary, $json + [Environment]::NewLine, [System.Text.UTF8Encoding]::new($false))
 Move-Item -LiteralPath $temporary -Destination $resolvedRegistry -Force
 $json
-

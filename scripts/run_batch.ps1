@@ -6,8 +6,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$OutputRoot,
 
-    [ValidateSet('custom-rig-npc', 'player-replacement', 'avatar-r15')]
-    [string]$IntendedUse = 'custom-rig-npc',
+    [ValidateSet('animated-model', 'custom-rig-npc', 'player-replacement', 'avatar-r15')]
+    [string]$IntendedUse = 'animated-model',
 
     [string]$BlenderPath,
 
@@ -353,13 +353,13 @@ if ($JobConfigPath) {
     if (-not (Test-Path -LiteralPath $JobConfigPath -PathType Leaf)) { throw "找不到批处理配置：$JobConfigPath" }
     $resolvedConfig = (Resolve-Path -LiteralPath $JobConfigPath).Path
     $configDirectory = Split-Path -Parent $resolvedConfig
-    $config = Get-Content -Raw -LiteralPath $resolvedConfig | ConvertFrom-Json
+    $config = Get-Content -Raw -Encoding UTF8 -LiteralPath $resolvedConfig | ConvertFrom-Json
     if ($null -eq $config.PSObject.Properties['jobs']) { throw '批处理配置缺少 jobs 数组。' }
 }
 
 $descriptors = @(Get-SourceJobs -ResolvedSource $resolvedSource)
 if ($descriptors.Count -gt 1 -and $BaseColorTexture) {
-    throw '批次包含多个资源，不能把一个全局 -BaseColorTexture 套到所有角色。请用 -JobConfigPath 为各任务显式配置。'
+    throw '批次包含多个资源，不能把一个全局 -BaseColorTexture 套到所有模型。请用 -JobConfigPath 为各任务显式配置。'
 }
 
 $auditScript = Join-Path $PSScriptRoot 'audit_source.ps1'
@@ -375,7 +375,7 @@ foreach ($descriptor in $descriptors) {
     New-Item -ItemType Directory -Force -Path $jobDir | Out-Null
 
     if ($Resume -and (Test-Path -LiteralPath $statePath -PathType Leaf)) {
-        $state = Get-Content -Raw -LiteralPath $statePath | ConvertFrom-Json
+        $state = Get-Content -Raw -Encoding UTF8 -LiteralPath $statePath | ConvertFrom-Json
         if ([string]$state.source_fingerprint.value -ne [string]$fingerprint.value) {
             throw "任务 $jobId 的原始资源指纹已变化。请使用新的输出目录重新执行。"
         }
@@ -444,7 +444,7 @@ foreach ($descriptor in $descriptors) {
         & $auditScript @auditArguments | Out-Null
         $auditExit = $LASTEXITCODE
         if (-not (Test-Path -LiteralPath $auditReport -PathType Leaf)) { throw "审计没有生成报告：$auditReport" }
-        $audit = Get-Content -Raw -LiteralPath $auditReport | ConvertFrom-Json
+        $audit = Get-Content -Raw -Encoding UTF8 -LiteralPath $auditReport | ConvertFrom-Json
         $state.audit_report = $auditReport
         $state.selected_source = [string]$audit.selected_source
 
@@ -509,7 +509,7 @@ foreach ($descriptor in $descriptors) {
 
         $validationPath = Join-Path $bundleDir 'bundle_validation.json'
         if (-not (Test-Path -LiteralPath $validationPath -PathType Leaf)) { throw "缺少交付包校验报告：$validationPath" }
-        $validation = Get-Content -Raw -LiteralPath $validationPath | ConvertFrom-Json
+        $validation = Get-Content -Raw -Encoding UTF8 -LiteralPath $validationPath | ConvertFrom-Json
         if ([string]$validation.status -ne 'BUNDLE_PASS') { throw "交付包未通过校验：$validationPath" }
 
         $planPath = Join-Path $jobDir 'studio_import_plan.json'
@@ -531,7 +531,7 @@ foreach ($state in $jobStates) {
     if (-not [string]$state.bundle_dir) { continue }
     $textureManifestPath = Join-Path ([string]$state.bundle_dir) 'texture_manifest.json'
     if (-not (Test-Path -LiteralPath $textureManifestPath -PathType Leaf)) { continue }
-    $textureManifest = Get-Content -Raw -LiteralPath $textureManifestPath | ConvertFrom-Json
+    $textureManifest = Get-Content -Raw -Encoding UTF8 -LiteralPath $textureManifestPath | ConvertFrom-Json
     foreach ($texture in @($textureManifest.textures | Where-Object { $_.delivered_file -and $_.sha256 })) {
         $textureOccurrences.Add([pscustomobject][ordered]@{
             job_id = [string]$state.job_id
@@ -544,7 +544,7 @@ foreach ($state in $jobStates) {
 $registryPath = Join-Path $resolvedOutputRoot 'studio_asset_registry.json'
 $registry = $null
 if (Test-Path -LiteralPath $registryPath -PathType Leaf) {
-    $registry = Get-Content -Raw -LiteralPath $registryPath | ConvertFrom-Json
+    $registry = Get-Content -Raw -Encoding UTF8 -LiteralPath $registryPath | ConvertFrom-Json
 }
 $textureIndex = @(
     foreach ($group in @($textureOccurrences | Group-Object sha256 | Sort-Object Name)) {

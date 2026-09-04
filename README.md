@@ -1,12 +1,12 @@
-# Roblox 带动画角色导入 Skill
+# Roblox 动画模型导入 Skill
 
-一个可移植的 Codex Skill。输入可以是 UnityPackage/GZIP、Unreal 工程或 UAsset 包、3ds Max、Blender、FBX、glTF、ZIP、7z、RAR 分卷以及混合资源目录；它先整理和分析原始资源，再转换、导入并实际播放验证 Roblox Custom Rig 角色。
+一个可移植的 Codex Skill。输入可以是人物、动物、僵尸、怪物、机械或车辆，也可以来自 UnityPackage/GZIP、Unreal 工程或 UAsset 包、3ds Max、Blender、FBX、glTF、ZIP、7z、RAR 分卷以及混合资源目录。它先按真实结构判断静态、骨骼动画或非骨架动画，再选择转换、导入和 Roblox Studio 验证路线。
 
-目标是让用户交出原始资源后，得到清楚的适用性评估和可在目标 Studio 使用的结果。Codex 负责必要转换、贴图兼容处理、逐资源判断骨架导入设置与验证；用户只配合必要的账号操作和效果选择。不同资源可能需要不同设置，不能把某个案例的成功选项当成通用固定值。
+目标是让用户交出原始资源后，得到清楚的适用性评估和可在目标 Studio 使用的结果。Codex 负责必要转换、贴图兼容处理、逐资源判断动画结构、骨架导入设置与验证；用户只配合必要的账号操作和效果选择。不同资源可能需要不同设置，不能把某个案例的成功选项当成通用固定值。
 
 ## 你会拿到什么
 
-先给一张中文资源卡：包里有什么、角色总三角面/最大单网格三角面、骨骼和动作、贴图规格、必要修复、适用性和待测风险。你只要求检测就到此停止；已要求导入则在授权范围内继续处理。
+先给一张中文资源卡：包里有什么、结构分类、模型总三角面/最大单网格三角面、骨骼和动作、贴图规格、必要修复、适用性和待测风险。你只要求检测就到此停止；已要求导入则在授权范围内继续处理。
 
 交付时说明哪些在 Studio 实测、哪些来自你的反馈、哪些尚未验证。需要手动操作时只给当前步骤的准确文件/对象、选项名和预期结果；脚本和 JSON 由 Codex 维护，不要求你学习整条技术管线。
 
@@ -21,10 +21,10 @@ git clone https://github.com/yangshulin2333/roblox-animated-character-import-ski
 重启或新开 Codex 任务后使用：
 
 ```text
-$roblox-animated-character-import 把 D:\path\character.zip 导入当前 Roblox Studio，优先验证全部动作；只在必要时用 Blender 修改，不另存 Studio 副本。
+$roblox-animated-character-import 把 D:\path\model.zip 导入当前 Roblox Studio。先判断它是骨骼动画、非骨架动画还是静态模型；适用时转换并优先验证全部动作，只在必要时用 Blender 修改，不另存 Studio 副本。
 ```
 
-如果界面使用 `@` 选择能力，在 Skill 列表中选择 **Roblox 带动画角色导入**；Skill 的稳定标识仍是 `$roblox-animated-character-import`。
+如果界面使用 `@` 选择能力，在 Skill 列表中选择 **Roblox 动画模型导入**；Skill 的稳定标识仍是 `$roblox-animated-character-import`，保留旧标识是为了兼容已安装版本和已有文档。
 
 ## 最短使用方式
 
@@ -51,11 +51,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_batch.ps1 `
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\audit_source.ps1 `
   -Source "D:\原始资源或压缩包" `
-  -IntendedUse custom-rig-npc `
+  -IntendedUse animated-model `
   -ReportDir "D:\检测报告\资源名"
 ```
 
-它会按文件签名识别真实格式，归并 RAR 分卷，还原 UnityPackage 的 GUID 资源结构，然后逐个检查可读候选，并按网格、Roblox 三角面、骨架、动作、UV、材质和贴图保留情况选择真正的源文件。`*_Roblox.fbx` 这样的文件名不算通过证据。
+它会按文件签名识别真实格式，归并 RAR 分卷，还原 UnityPackage 的 GUID 资源结构，然后逐个检查可读候选，并按网格、Roblox 三角面、骨架、动作、UV、材质和贴图保留情况选择真正的源文件。报告中的 `asset_kind` 说明它属于骨骼动画、缺动作的骨架、非骨架动画还是静态模型；`*_Roblox.fbx` 这样的文件名不算通过证据。
 
 如果只想确认原始包是什么，不解包：
 
@@ -69,7 +69,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\intake_source.ps1 `
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\run_pipeline.ps1 `
-  -Source "D:\path\character.blend" `
+  -Source "D:\path\animated_model.blend" `
   -OutputDir "D:\path\RobloxExport" `
   -AllActions `
   -FixMaxInfluences
@@ -79,7 +79,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_pipeline.ps1 `
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\prepare_animation_import.ps1 `
-  -StudioImportPlan "D:\本批次\角色任务\studio_import_plan.json" `
+  -StudioImportPlan "D:\本批次\模型任务\studio_import_plan.json" `
   -TargetRigPath "Workspace.实际模型名" `
   -UniverseId "目标UniverseId" `
   -PlaceId "目标PlaceId" `
@@ -93,7 +93,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\prepare_animation_import.ps1 
 
 - 不覆盖源文件；
 - 不自动另存 Roblox Studio 项目；
-- 默认拒绝缺少 UV、材质槽或材质贴图引用的角色，避免再次生成白模；
+- 默认拒绝缺少 UV、材质槽或材质贴图引用的模型，避免再次生成白模；
 - 默认输出一个绑定模型 FBX、每个动作一个 FBX、外部贴图和 JSON 清单；
 - 正式外部贴图会自动重编码为 8 位 RGB/RGBA、无应用元数据的 `*_Roblox.png`，完成 CRC、像素回读和 SHA-256 校验；Studio 只上传 `texture_manifest.json` 的 `delivered_file`；
 - 默认最大贴图边长为 4096；需要移动端 2048/1024 时使用 `-MaxTextureDimension` 显式选择；
@@ -113,4 +113,4 @@ powershell -ExecutionPolicy Bypass -File .\scripts\prepare_animation_import.ps1 
 
 ## 安全与分发
 
-仓库不包含模型、贴图、Cookie、API Key、Roblox 账号信息或本机绝对路径。请确认你对导入和分发的角色资源拥有相应权利。
+仓库不包含模型、贴图、Cookie、API Key、Roblox 账号信息或本机绝对路径。请确认你对导入和分发的模型资源拥有相应权利。

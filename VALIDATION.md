@@ -1,5 +1,16 @@
 # Validation record
 
+## 2026-09-04 — v2.4 从“角色”扩展为按结构判断的动画模型
+
+- 面向用户的名称改为 **Roblox 动画模型导入**；稳定调用标识仍保留 `$roblox-animated-character-import`，避免已安装 Skill、离线包和旧文档失效。
+- 默认用途改为 `animated-model`。审计不再按人形外观判断，而是输出 `asset_kind`：骨骼动画、只有骨架无动作、非骨架动画待复核、静态模型候选或无模型。
+- 人物、动物、僵尸、怪物以及用骨骼驱动的车辆/机械共用骨骼动画管线。对象关键帧、约束、驱动器或引擎控制器动画返回 `ANIMATION_BAKE_REQUIRED`，要求烘焙到骨骼或在 Roblox 用关节重建；静态资源返回 `STATIC_MODEL_CANDIDATE`，不会伪造骨架或动作。
+- 真实怪物源 `Scorchfang_Scorpion.blend` 在 Windows PowerShell 5.1 下以 `animated-model` 审计：`BONE_ANIMATED_MODEL`、3,786 三角面、1 套骨架、17 个动作，状态 `CONVERSION_REQUIRED`，原有四骨骼影响与格式转换门禁仍然生效。
+- 真实 `model_bind.fbx`（有骨架、无动作）返回 `RIGGED_MODEL_WITHOUT_ACTIONS` / `ANIMATION_DATA_MISSING`；临时静态 OBJ 返回 `STATIC_MODEL_CANDIDATE`；临时无骨架对象关键帧 `.blend` 返回 `NON_ARMATURE_ANIMATION_REVIEW_REQUIRED` / `ANIMATION_BAKE_REQUIRED`。
+- 首次干净 PowerShell 5.1 前向测试发现两项跨电脑缺陷：调用子 PowerShell 脚本后读取未初始化的 `$LASTEXITCODE`，以及无 BOM UTF-8 JSON 被按系统代码页读取。前者改为以 intake 报告状态为准，后者在审计、批处理、主管线和素材登记脚本中显式使用 UTF-8。
+- `run_batch.ps1 -PlanOnly -IntendedUse animated-model` 返回 `BATCH_PLANNED`；原动画计划回归在 PowerShell 5.1 / 7 均通过 23 个断言；PowerShell/Python 语法、Skill 快速结构校验和 `git diff --check` 通过。
+- 本轮没有拿真实车辆资源做 Studio 播放，因此只确认“能识别并正确分流”与已有怪物骨骼管线回归，不能宣称任意车辆动画已直接兼容 Roblox。
+
 ## 2026-09-04 — v2.3 逐资源决策与中文资源卡
 
 - 纠正 v2.2 将蝎子有效选项推广为通用要求的问题。新计划休息姿势为 `UNDECIDED`，Codex 检查后登记候选、理由及证据；支持当前界面三种选项，不按位置选择。

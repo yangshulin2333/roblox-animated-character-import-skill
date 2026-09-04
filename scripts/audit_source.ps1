@@ -3,8 +3,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Source,
 
-    [ValidateSet('custom-rig-npc', 'player-replacement', 'avatar-r15')]
-    [string]$IntendedUse = 'custom-rig-npc',
+    [ValidateSet('animated-model', 'custom-rig-npc', 'player-replacement', 'avatar-r15')]
+    [string]$IntendedUse = 'animated-model',
 
     [string]$BlenderPath,
 
@@ -49,13 +49,12 @@ $intakeArguments = @{
 if ($ArchiveToolPath) { $intakeArguments.ArchiveToolPath = $ArchiveToolPath }
 if ($HashSources) { $intakeArguments.HashSources = $true }
 & $intakeScript @intakeArguments | Out-Null
-$intakeExit = $LASTEXITCODE
-$intake = Get-Content -Raw -LiteralPath $intakeReport | ConvertFrom-Json
+$intake = Get-Content -Raw -Encoding UTF8 -LiteralPath $intakeReport | ConvertFrom-Json
 
-if ($intakeExit -ne 0 -or [string]$intake.status -ne 'SOURCE_NORMALIZED') {
+if ([string]$intake.status -ne 'SOURCE_NORMALIZED') {
     $blockedStatus = if (@($intake.blockers).Count -gt 0) { [string]$intake.blockers[0].code } else { 'SOURCE_INTAKE_BLOCKED' }
     $blockedReport = [ordered]@{
-        schema_version = '2.0'
+        schema_version = '2.1'
         status = $blockedStatus
         status_zh = [string]$intake.status_zh
         intended_use = $IntendedUse
@@ -86,7 +85,7 @@ if ($intakeExit -ne 0 -or [string]$intake.status -ne 'SOURCE_NORMALIZED') {
 
 $normalizedSource = [string]$intake.normalized_source
 & $preflightScript -Source $normalizedSource -BlenderPath $BlenderPath -ReportPath $preflightReport | Out-Null
-$preflight = Get-Content -Raw -LiteralPath $preflightReport | ConvertFrom-Json
+$preflight = Get-Content -Raw -Encoding UTF8 -LiteralPath $preflightReport | ConvertFrom-Json
 
 $candidateResults = @()
 $candidates = @($preflight.source.candidates)
@@ -99,6 +98,7 @@ function Get-ReasonZh {
         'MESH_TRIANGLE_LIMIT' { '至少一个独立网格超过 Roblox 三角面上限' }
         'ARMATURE_MISSING' { '缺少骨架' }
         'ACTIONS_MISSING' { '缺少骨骼动画' }
+        'NON_ARMATURE_ANIMATION' { '检测到动作数据，但没有可用于当前导出管线的骨架' }
         'MAX_INFLUENCES_EXCEEDED' { '存在超过四根骨骼影响的顶点' }
         'UV_MISSING' { '至少一个可见网格缺少 UV' }
         'MATERIAL_MAPPING_MISSING' { '至少一个可见网格缺少材质槽或材质映射' }
@@ -131,7 +131,7 @@ if ($candidates.Count -gt 0 -and $blender) {
             continue
         }
 
-        $inspection = Get-Content -Raw -LiteralPath $candidateReportPath | ConvertFrom-Json
+        $inspection = Get-Content -Raw -Encoding UTF8 -LiteralPath $candidateReportPath | ConvertFrom-Json
         $meshes = @($inspection.meshes)
         $extension = [System.IO.Path]::GetExtension([string]$candidate).ToLowerInvariant()
         $directFormat = $extension -in @('.fbx', '.glb', '.gltf')
@@ -150,11 +150,23 @@ if ($candidates.Count -gt 0 -and $blender) {
         $appearanceReady = $allMeshesHaveUv -and $allMeshesHaveMaterial -and $hasImages
         $influencesPass = [int]$inspection.summary.vertices_over_four_influences -eq 0
 
-        $hardBlockers = @($inspection.blockers | Where-Object { $_.code -ne 'MAX_INFLUENCES_EXCEEDED' })
-        $requiresRig = $IntendedUse -in @('custom-rig-npc', 'player-replacement', 'avatar-r15')
+        $hardBlockers = @($inspection.blockers | Where-Object { $_.code -notin @('MAX_INFLUENCES_EXCEEDED', 'NO_ARMATURE') })
+        $requiresRig = $IntendedUse -in @('animated-model', 'custom-rig-npc', 'player-replacement', 'avatar-r15')
         $structureReady = $hasMesh -and $allTriangleLimitsPass -and $hardBlockers.Count -eq 0
         if ($requiresRig) {
             $structureReady = $structureReady -and $hasArmature -and $hasActions
+        }
+
+        $assetKind = if ($hasMesh -and $hasArmature -and $hasActions) {
+            'BONE_ANIMATED_MODEL'
+        } elseif ($hasMesh -and $hasArmature) {
+            'RIGGED_MODEL_WITHOUT_ACTIONS'
+        } elseif ($hasMesh -and $hasActions) {
+            'NON_ARMATURE_ANIMATION_REVIEW_REQUIRED'
+        } elseif ($hasMesh) {
+            'STATIC_MODEL_CANDIDATE'
+        } else {
+            'NO_MODEL'
         }
 
         $reasonCodes = New-Object System.Collections.Generic.List[string]
@@ -162,6 +174,7 @@ if ($candidates.Count -gt 0 -and $blender) {
         if (-not $allTriangleLimitsPass) { $reasonCodes.Add('MESH_TRIANGLE_LIMIT') }
         if ($requiresRig -and -not $hasArmature) { $reasonCodes.Add('ARMATURE_MISSING') }
         if ($requiresRig -and -not $hasActions) { $reasonCodes.Add('ACTIONS_MISSING') }
+        if ($hasActions -and -not $hasArmature) { $reasonCodes.Add('NON_ARMATURE_ANIMATION') }
         if (-not $influencesPass) { $reasonCodes.Add('MAX_INFLUENCES_EXCEEDED') }
         if (-not $allMeshesHaveUv) { $reasonCodes.Add('UV_MISSING') }
         if (-not $allMeshesHaveMaterial) { $reasonCodes.Add('MATERIAL_MAPPING_MISSING') }
@@ -191,6 +204,7 @@ if ($candidates.Count -gt 0 -and $blender) {
             path = $candidate
             extension = $extension
             inspection = [string]$inspection.status
+            asset_kind = $assetKind
             direct_import_candidate = $directReady
             conversion_candidate = $conversionCandidate
             appearance_mapping_ready = $appearanceReady
@@ -220,9 +234,14 @@ $selected = $candidateResults |
     Sort-Object @{ Expression = 'score'; Descending = $true }, path |
     Select-Object -First 1
 
+$bestObserved = $candidateResults |
+    Where-Object { $_.asset_kind -ne 'NO_MODEL' } |
+    Sort-Object @{ Expression = 'score'; Descending = $true }, path |
+    Select-Object -First 1
+
 $status = 'SOURCE_BLOCKED'
-$statusZh = '原始资源中没有找到可继续处理的动画角色源'
-$nextAction = '请提供可读取的模型、骨架、动画和贴图源文件。'
+$statusZh = '原始资源中没有找到可继续处理的动画模型源'
+$nextAction = '请提供可读取的模型、动画结构和贴图源文件。'
 if ($selected) {
     if ($selected.direct_import_candidate) {
         $status = 'DIRECT_IMPORT_CANDIDATE'
@@ -230,9 +249,21 @@ if ($selected) {
         $nextAction = '在目标 Studio 项目中导入该候选文件，并继续检查贴图、动作、权限和尺寸。'
     } else {
         $status = 'CONVERSION_REQUIRED'
-        $statusZh = '找到可转换的角色源，但必须先修复或转换'
+        $statusZh = '找到可转换的动画模型源，但必须先修复或转换'
         $nextAction = '使用临时 Blender 场景处理选中的源文件，导出 FBX 后重新读取验证，再进入 Studio。'
     }
+} elseif ($bestObserved -and $bestObserved.asset_kind -eq 'NON_ARMATURE_ANIMATION_REVIEW_REQUIRED') {
+    $status = 'ANIMATION_BAKE_REQUIRED'
+    $statusZh = '模型含动作数据，但当前不是可直接导出的骨骼动画结构'
+    $nextAction = '先确认动作来自对象关键帧、约束、驱动器还是引擎控制器；需要在 DCC 中烘焙到骨骼，或在 Roblox 使用 Motor6D、HingeConstraint 等重建活动部件。'
+} elseif ($bestObserved -and $bestObserved.asset_kind -eq 'RIGGED_MODEL_WITHOUT_ACTIONS') {
+    $status = 'ANIMATION_DATA_MISSING'
+    $statusZh = '找到带骨架的模型，但没有可导出的动作数据'
+    $nextAction = '检查动画是否在 NLA、引擎控制器、外部动作文件或原生 DCC 工程中；恢复动作后重新审计。'
+} elseif ($bestObserved -and $bestObserved.asset_kind -eq 'STATIC_MODEL_CANDIDATE') {
+    $status = 'STATIC_MODEL_CANDIDATE'
+    $statusZh = '找到静态模型，但没有检测到可用骨架动画'
+    $nextAction = '若只需要静态道具，转入静态模型导入流程；若它是需要开门、车轮或机械臂运动的车辆/机械，请先确定骨骼烘焙或 Roblox 关节实现方案。'
 } elseif (@($preflight.source.native_dcc_files).Count -gt 0) {
     $status = 'NATIVE_DCC_EXPORT_REQUIRED'
     $statusZh = '只找到原生工程资源，需要从对应软件导出'
@@ -240,7 +271,7 @@ if ($selected) {
 }
 
 $report = [ordered]@{
-    schema_version = '2.0'
+    schema_version = '2.1'
     status = $status
     status_zh = $statusZh
     intended_use = $IntendedUse
@@ -269,8 +300,8 @@ $report = [ordered]@{
     }
     next_action_zh = $nextAction
     next_action = $nextAction
-    note_zh = 'DIRECT_IMPORT_CANDIDATE 只表示本地候选文件通过结构检测，不代表 Studio 已验收；贴图显示、动作播放、素材权限、尺寸和目标设备性能仍是独立门禁。'
-    note = 'DIRECT_IMPORT_CANDIDATE 只表示本地候选文件通过结构检测，不代表 Studio 已验收；贴图显示、动作播放、素材权限、尺寸和目标设备性能仍是独立门禁。'
+    note_zh = 'asset_kind 按实际结构分类，不按人、动物、怪物或车辆外观分类。DIRECT_IMPORT_CANDIDATE 只表示本地候选文件通过结构检测，不代表 Studio 已验收；贴图显示、动作播放、素材权限、尺寸和目标设备性能仍是独立门禁。'
+    note = 'asset_kind 按实际结构分类，不按人、动物、怪物或车辆外观分类。DIRECT_IMPORT_CANDIDATE 只表示本地候选文件通过结构检测，不代表 Studio 已验收；贴图显示、动作播放、素材权限、尺寸和目标设备性能仍是独立门禁。'
 }
 
 $parent = Split-Path -Parent $resolvedReportPath
@@ -279,4 +310,4 @@ $json = $report | ConvertTo-Json -Depth 12
 [System.IO.File]::WriteAllText($resolvedReportPath, $json + [Environment]::NewLine, [System.Text.UTF8Encoding]::new($false))
 $json
 
-if ($status -in @('SOURCE_BLOCKED', 'NATIVE_DCC_EXPORT_REQUIRED')) { exit 2 }
+if ($status -in @('SOURCE_BLOCKED', 'NATIVE_DCC_EXPORT_REQUIRED', 'ANIMATION_BAKE_REQUIRED', 'ANIMATION_DATA_MISSING', 'STATIC_MODEL_CANDIDATE')) { exit 2 }

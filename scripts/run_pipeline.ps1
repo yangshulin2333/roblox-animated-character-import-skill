@@ -70,14 +70,14 @@ $bundleValidation = Join-Path $resolvedOutput 'bundle_validation.json'
 $textureNormalizationReport = Join-Path $resolvedOutput 'texture_normalization.json'
 
 & $preflightScript -Source $resolvedSource -BlenderPath $BlenderPath -OutputDir $resolvedOutput -ReportPath $preflightReport | Out-Null
-$preflight = Get-Content -Raw -LiteralPath $preflightReport | ConvertFrom-Json
+$preflight = Get-Content -Raw -Encoding UTF8 -LiteralPath $preflightReport | ConvertFrom-Json
 if ($preflight.status -ne 'PREFLIGHT_PASS') { throw "Preflight failed. See $preflightReport" }
 $blender = [string]$preflight.blender.path
 if (-not $blender) { throw 'Preflight returned no Blender executable.' }
 
 & $blender --background --factory-startup --disable-autoexec --python $inspectScript -- --source $resolvedSource --report $inspectionReport
 if ($LASTEXITCODE -ne 0) { throw "Blender inspection failed. See $inspectionReport" }
-$inspection = Get-Content -Raw -LiteralPath $inspectionReport | ConvertFrom-Json
+$inspection = Get-Content -Raw -Encoding UTF8 -LiteralPath $inspectionReport | ConvertFrom-Json
 
 $unresolvedBlockers = @()
 foreach ($blocker in @($inspection.blockers)) {
@@ -143,7 +143,7 @@ if ($TextureMode -eq 'separate') {
     if (-not (Test-Path -LiteralPath $textureNormalizationReport -PathType Leaf)) {
         throw "TEXTURE_COMPATIBILITY_BLOCKED: texture normalization produced no report: $textureNormalizationReport"
     }
-    $textureNormalization = Get-Content -Raw -LiteralPath $textureNormalizationReport | ConvertFrom-Json
+    $textureNormalization = Get-Content -Raw -Encoding UTF8 -LiteralPath $textureNormalizationReport | ConvertFrom-Json
     $textureNormalizationStatus = [string]$textureNormalization.status
     if ($textureNormalizationStatus -notin @('TEXTURE_NORMALIZATION_PASS', 'TEXTURE_NORMALIZATION_SKIPPED')) {
         throw "TEXTURE_COMPATIBILITY_BLOCKED: unexpected texture normalization status: $textureNormalizationStatus"
@@ -156,7 +156,7 @@ if ($LASTEXITCODE -ne 0) { throw "Fresh FBX read-back failed. See $readbackRepor
 & $blender --background --factory-startup --disable-autoexec --python $validateScript -- --bundle $resolvedOutput --report $bundleValidation
 if ($LASTEXITCODE -ne 0) { throw "Bundle validation failed. See $bundleValidation" }
 
-$manifest = Get-Content -Raw -LiteralPath (Join-Path $resolvedOutput 'bundle_manifest.json') | ConvertFrom-Json
+$manifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $resolvedOutput 'bundle_manifest.json') | ConvertFrom-Json
 $result = [ordered]@{
     status = 'ROUNDTRIP_PASS'
     output_dir = $resolvedOutput

@@ -1,6 +1,6 @@
 # 批量处理、断点续跑与去重
 
-本文件定义批处理外壳。单个角色仍使用 `audit_source.ps1` 和 `run_pipeline.ps1`；`run_batch.ps1` 负责把大量、来源各异的原始资源拆成独立任务，并保存可恢复状态。
+本文件定义批处理外壳。单个模型仍使用 `audit_source.ps1` 和 `run_pipeline.ps1`；`run_batch.ps1` 负责把大量、来源各异的人物、动物、怪物、机械或车辆资源拆成独立任务，并保存可恢复状态。
 
 ## 为什么仍然只保留一个 Skill
 
@@ -74,7 +74,7 @@ powershell -ExecutionPolicy Bypass -File scripts/run_batch.ps1 `
 }
 ```
 
-相对贴图路径以配置文件所在目录为基准。`base_color_texture` 只用于已经从原始 Prefab/Material/DCC 关系中核验的单张基础色修复；复杂 PBR、透明或多材质角色仍必须建立明确通道映射。
+相对贴图路径以配置文件所在目录为基准。`base_color_texture` 只用于已经从原始 Prefab/Material/DCC 关系中核验的单张基础色修复；复杂 PBR、透明或多材质模型仍必须建立明确通道映射。
 
 ## 机器可读状态
 
@@ -127,7 +127,7 @@ powershell -ExecutionPolicy Bypass -File scripts/run_batch.ps1 `
 
 默认 `TextureMode=separate`，把模型/骨架上传和图片上传拆开，减少 `base_color_texture` 事务失败后重复创建半成品素材的风险。`linked` 或 `embed` 只有在目标 Studio 实测可靠时才使用。
 
-每个 `separate` 任务在进入 `READY_FOR_STUDIO` 前自动把正式外部图片转换为 `*_Roblox.png`，移除应用元数据并完成结构/像素回读。`studio_import_plan.json` 只列标准化后的路径和哈希。默认最大边长 4096；需要移动端降到 2048/1024 时必须逐任务配置 `max_texture_dimension`，不能把一个全局质量决策静默套到不同角色。
+每个 `separate` 任务在进入 `READY_FOR_STUDIO` 前自动把正式外部图片转换为 `*_Roblox.png`，移除应用元数据并完成结构/像素回读。`studio_import_plan.json` 只列标准化后的路径和哈希。默认最大边长 4096；需要移动端降到 2048/1024 时必须逐任务配置 `max_texture_dimension`，不能把一个全局质量决策静默套到不同模型。
 
 `model_all_in_one.fbx` 只有显式 `-IncludePreviewAllInOne` 才生成，并在清单中标记 `preview_only`。它不能替代每动作一个 FBX 的跨电脑契约。
 

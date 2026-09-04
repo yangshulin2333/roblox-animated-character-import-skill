@@ -45,7 +45,7 @@ Read this before retrying. A retry must change a relevant condition and must not
 | Track plays once but loop jumps | Source or conversion seam | Compare first/last poses and root translation; repair only if seamless loop is required | action pass may be non-looping only if user accepts |
 | Model scaled and root motion becomes wrong | Post-scale animation | replay all actions; inspect translation keys, attachments, feet, and collision | `SCALE_BLOCKED` |
 | Upload result is uncertain after timeout | Partial cloud mutation | inspect queue and Asset Manager before retrying; record any created IDs | stop if state cannot be determined safely |
-| 批处理在第 N 个角色失败 | 批次局部失败 | 保留 `bundle_attempt_NNN` 和 `job_state.json`，修正条件后 `-Resume` | 不得删除批次根目录或重跑已到 `READY_FOR_STUDIO` 的任务 |
+| 批处理在第 N 个模型失败 | 批次局部失败 | 保留 `bundle_attempt_NNN` 和 `job_state.json`，修正条件后 `-Resume` | 不得删除批次根目录或重跑已到 `READY_FOR_STUDIO` 的任务 |
 | MCP configured but `list_roblox_studios` is empty | Connection | reconnect plugin/session or use manual runbook | not an asset failure; no automated Studio claim |
 | Studio window is unresponsive | Tool/UI | at 60 seconds capture state/log; at 5 minutes report blocked; do not kill an unsaved user window | `TOOL_BLOCKED` |
 | Save As was cancelled | Persistence only | leave current scene open and report unsaved state separately | import/playback result remains whatever was observed |

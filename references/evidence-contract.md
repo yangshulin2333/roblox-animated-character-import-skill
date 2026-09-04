@@ -45,7 +45,7 @@ Use exactly one highest status and list lower gates separately:
 ## Minimum report template
 
 ```markdown
-# Animated character import report
+# Animated model import report
 
 - Date/time and timezone:
 - Operator/Codex version:
@@ -68,7 +68,8 @@ Use exactly one highest status and list lower gates separately:
 - 原始容器类型、分卷成员和标准化路径：
 - Unity/Unreal/Blender/3ds Max 生态识别结果：
 - Source-package audit status and selected candidate:
-- Intended use: custom-rig-npc | player-replacement | avatar-r15
+- Intended use: animated-model | custom-rig-npc | player-replacement | avatar-r15
+- Detected asset kind: BONE_ANIMATED_MODEL | RIGGED_MODEL_WITHOUT_ACTIONS | NON_ARMATURE_ANIMATION_REVIEW_REQUIRED | STATIC_MODEL_CANDIDATE | NO_MODEL
 - Requested gate:
 - Highest observed status:
 
@@ -84,7 +85,7 @@ Use exactly one highest status and list lower gates separately:
 
 ## 中文资源卡（优先交给用户）
 
-- 原始包实际包含：角色、外观、动作、贴图及不能直接迁移的内容。
+- 原始包实际包含：模型/资源组、结构分类、外观、动作、贴图及不能直接迁移的内容。
 - 原始/最终总三角面、最大单 Mesh 三角面、网格数和数据来源。
 - 骨骼数、权重、动作数量/名称与本次贴图规格。
 - 结论：导入兼容性 / NPC或玩家用途 / 手机电脑性能，分别说明。
