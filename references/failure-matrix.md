@@ -18,7 +18,7 @@ Read this before retrying. A retry must change a relevant condition and must not
 | Intended Roblox Root is weighted or far from origin | Rig | First distinguish the designated Root from a top-level deform bone; repair root influence/transform in a temporary scene | stop if animation space cannot be preserved |
 | Several top-level bones are present | Rig ambiguity | Inspect hierarchy/actions; do not auto-delete roots or merge skeletons. A weighted top-level deform bone is not automatically the designated Roblox Root | `EXPORT_REVIEW_REQUIRED` until Studio playback confirms the hierarchy |
 | Action cannot be assigned in Blender | Action slot/rest pose | Select compatible action slot or retarget explicitly; verify frame range | `EXPORT_BLOCKED` for required action |
-| 同源单动作 FBX 导入后姿势错乱或导入器要求休息姿势来源 | Studio 导入设置缺失 | 目标设为已导入的 Custom Rig，并选择第二项“导入的骨架”；若骨架层级/休息姿势并非同源则停止并重定向 | `PLAYBACK_BLOCKED`，不得盲目批量继续 |
+| 动画 FBX 导入后姿势错乱或要求休息姿势来源 | 绑定姿势、层级、轴向或导出变换不匹配 | Codex 比较源/目标骨架，按 Studio 操作手册判断候选，用一个代表动作试播；记录实际选项名与证据，不固定第几项 | `PLAYBACK_BLOCKED`，不得盲目批量继续；不能靠选项完成的重定向另行处理 |
 | Multi-action FBX behaves differently on another PC | Unsupported portability assumption | Export one animation track per FBX and import each onto the same target rig | do not use multi-action result as cross-PC evidence |
 | Model is about 100× too large/small or sideways | Units/axes | Recheck FBX Unit Scale, exporter axes, Importer Scale Unit and World Forward/Up; avoid stacking arbitrary factors | `IMPORT_BLOCKED` if orientation/scale remains unknown |
 | `base_color_texture` upload fails | Texture upload transaction | Record error, generate/use textureless FBX and separate images, remove failed queue row, add file again | `IMPORT_BLOCKED` after one changed-condition retry |

@@ -124,15 +124,34 @@ For each action:
 1. select the imported target rig;
 2. open Animation Editor and choose that rig;
 3. set rig type to Custom;
-4. for a one-action FBX generated from the same bind skeleton, set rest-pose source to the second option **“导入的骨架”**; do not use this rule for unrelated or retargeted skeletons;
+4. have Codex select and record the rest-pose source using the per-asset decision below; use the UI label, not its ordinal position;
 5. import the matching FBX animation onto the same skeleton;
 6. confirm frame range, pose, root motion, and loop setting;
 7. save locally for preview;
 8. publish only when persistent runtime use is requested;
-9. choose the same intended owner as the experience when possible, otherwise grant the target experience access immediately after publishing;
+9. choose the intended owner when possible; check target-experience access and grant it only if missing;
 10. record the resulting animation ID, owner, Universe permission, and fresh-Play result.
 
-For a bundle with many actions, run `scripts/prepare_animation_import.ps1` after the target model exists in Workspace. The default queue policy is: import every action locally, preview and shortlist, then publish only the selected actions. Roblox's public [`Plugin:ImportFbxAnimationAsync()`](https://create.roblox.com/docs/reference/engine/classes/Plugin#ImportFbxAnimationAsync) still opens an import prompt and does not accept a supplied file path, so a reliable batch uses a guided Studio UI loop and verifies every imported action instead of claiming a headless one-call import.
+For a bundle with many actions, run `scripts/prepare_animation_import.ps1` after the target model exists in Workspace. A new plan returns `REST_POSE_REVIEW_REQUIRED`, not a guessed option. After inspection, pass `-RestPoseSource`, `-RestPoseReason` and optional `-RestPoseEvidence`; the script records the decision but does not make or validate it. Use `-RestPoseDecisionStatus USER_REPORTED_WORKING` for explicit user feedback, or `VERIFIED` only with actual inspection/playback evidence. Record a published ID by `-PublishedActionName` plus `-PublishedAssetId`, never by queue position.
+
+The default queue policy is: import every action locally, preview and shortlist, then publish only the selected actions. Roblox's public [`Plugin:ImportFbxAnimationAsync()`](https://create.roblox.com/docs/reference/engine/classes/Plugin#ImportFbxAnimationAsync) opens an import prompt and does not accept a supplied file path. Use an available, verified UI/tool route; do not claim unattended batch support from a file list alone. Codex performs available safe UI actions; the user handles only steps that require their account or cannot be controlled reliably.
+
+### 逐资源判断休息姿势来源
+
+这不是“固定选第二项”的流程。先检查目标 Rig、源 FBX 绑定姿势、父子层级、局部旋转、轴向、单位和导出变换。以下是候选选择依据，不是凭文件后缀自动判断：
+
+| 当前界面选项 | 何时纳入候选 / 必须核对什么 |
+| --- | --- |
+| 导入的骨架 | 动画 FBX 保留的绑定姿势是否与目标模型一致；同包导出只是线索 |
+| 导入的骨架（旋转归零） | 是否有明确的旋转归零约定或对比证据；不能因为它排第一就用，也不能一律排除 |
+| 动画编辑器骨架 | 是否要使用目标 Rig 的已有休息姿势，且源动画与目标层级/坐标兼容；它不是自动重定向工具 |
+
+1. 记录建议选项、理由和仍待核验处。若暂不能确定，比较一个代表性动作的不同候选；不要先批量导入全部。
+2. 检查开始/中间/结束姿势、关节扭转、根运动、时间推进和骨骼变化。失败后改变有依据的设置，必要时回 Blender 修正；不只看时间轴有关键帧。
+3. 通过后记录该绑定模型/动作文件身份、目标 Rig 和实际选项。复用到相同条件的剩余动作，逐项验证；源、目标或变换变化则重新判断。
+4. 给用户的操作示例：“本次蝎子选『导入的骨架』，已有本模型试播反馈；其他模型我会重新检查。”不要让用户承担技术选项选择。
+
+同一包可能包含不同骨架或不同导出条件，应拆为设置一致的队列。设置确认不等于动画云端授权，也不代表所有动作都播放通过。
 
 If the action cannot be imported onto the rig, return to Blender and compare bone hierarchy, rest pose, action slots, and coordinate space. Matching names alone are insufficient.
 

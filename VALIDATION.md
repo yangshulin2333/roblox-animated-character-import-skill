@@ -1,5 +1,15 @@
 # Validation record
 
+## 2026-09-04 — v2.3 逐资源决策与中文资源卡
+
+- 纠正 v2.2 将蝎子有效选项推广为通用要求的问题。新计划休息姿势为 `UNDECIDED`，Codex 检查后登记候选、理由及证据；支持当前界面三种选项，不按位置选择。
+- `test_animation_import_plan.ps1` 在 Windows PowerShell 5.1 和 PowerShell 7 均通过 23 个断言：默认不猜选项、理由/证据门禁、三个显式选项、不变范围保留、换文件/目标复核、旧硬编码迁移、按动作名登记发布 ID、保留用户报告而不自动升级通过状态。
+- 回归使用微型假文件测试计划身份与状态逻辑，**不测试 FBX 解析、真实选项正确性或 Studio 批量导入**。
+- 10 个 PowerShell 脚本在 PowerShell 7 解析无错误，5 个 Python 脚本 AST 检查与 Skill 快速结构校验通过。
+- 私有蝎子计划修正发布窗口的 Attack02 映射，移除错误的 Attack01 关联。用户反馈分享后 Play 播放一次，标为 `USER_REPORTED_SINGLE_PLAY`；本轮没有重新连接 Studio、上传资产或另存项目。
+- 中文资源卡分别说明原始与最终三角面、骨架/动作、外观规格、必要修复、导入兼容性与未测设备性能。没有重新转换原资源；原始 3,786 三角面与现有导出回读一致。
+- 这轮证明计划与说明纠偏，不代表在多种新原始资源、另一台电脑或全部动画上已完成前向验收。
+
 ## 2026-09-03 — v2.1 Roblox 贴图标准化门禁
 
 针对 Studio 拒绝导入的私有蝎子基础色贴图加入上传前自动化。来源文件为 2048×2048、8 位 RGB PNG，普通解码和尺寸检查通过，但包含 `pHYs` 与 XMP `iTXt` 辅助块；没有保留 Studio 原始错误文本，因此不能把 XMP 声明为唯一根因。
@@ -123,7 +133,7 @@ The portable scorpion bundle was tested again in the live `MAX模型` experience
 
 - The target `Workspace.Scorchfang_V2` contained 81 Bones, one skinned MeshPart, one `AnimationController`, and a server-visible `Animator`.
 - The bind mesh and normalized texture dependencies both returned successful preload results.
-- A one-action FBX reached the Animation Editor timeline only after the Custom Rig import settings used the second rest-pose option, **“导入的骨架”**. This is now an explicit same-bind-skeleton requirement in the generated import plan.
+- In this scorpion test the user selected **“导入的骨架”** and reached the Animation Editor timeline. The earlier workflow incorrectly generalized that result; v2.3 removes the fixed option and requires per-asset assessment and representative-action validation.
 - The canary animation was published under a collaborator's personal creator, while the target Universe belonged to a different user. Concrete account and asset identifiers remain only in the private job plan and are not included in this public repository.
 - Fresh Play returned an experience-access error for that animation; the track length remained zero and no animation played.
 

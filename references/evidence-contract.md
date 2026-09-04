@@ -57,7 +57,9 @@ Use exactly one highest status and list lower gates separately:
 - Importer Creator:
 - Target already saved/published: yes | no
 - Animation target rig path:
-- Animation rest-pose source: `IMPORTED_SKELETON` | retarget review required
+- Animation rest-pose source: `UNDECIDED` | `IMPORTED_SKELETON` | `IMPORTED_SKELETON_ZERO_ROTATIONS` | `ANIMATION_EDITOR_SKELETON`
+- Decision reason, source/target scope, and representative-action evidence:
+- Decision status: proposed | user-reported working | tool/visual verified
 - Animation uploader and experience owner:
 - Target Universe ID:
 - Upload to Roblox: yes | no
@@ -80,6 +82,15 @@ Use exactly one highest status and list lower gates separately:
 - UV layers / material slots / material-linked images:
 - Source units and bounds / selected Studio Scale Unit:
 
+## 中文资源卡（优先交给用户）
+
+- 原始包实际包含：角色、外观、动作、贴图及不能直接迁移的内容。
+- 原始/最终总三角面、最大单 Mesh 三角面、网格数和数据来源。
+- 骨骼数、权重、动作数量/名称与本次贴图规格。
+- 结论：导入兼容性 / NPC或玩家用途 / 手机电脑性能，分别说明。
+- Codex 将完成的必要操作；用户当前唯一需要配合的步骤，或“暂不需要”。
+- 本模型建议选项与依据；已验证和待验证项。
+
 ## Export facts
 
 - Model FBX:
@@ -101,6 +112,8 @@ Use exactly one highest status and list lower gates separately:
 
 | Action | Source present | Studio asset/local sequence | Starts | Time advances | Bone changes | Visual result | After scale |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+
+用户报告“授权后播放一次”记为 `USER_REPORTED_SINGLE_PLAY`，标注动作/ID（不能确定时留待核实）和日期；不升级为工具实测的全部动作、循环或性能通过。发布 ID 必须和发布窗口/动作名核对，不能自动归给首个队列项。
 
 ## Texture and permissions
 

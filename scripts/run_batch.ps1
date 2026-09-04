@@ -265,8 +265,8 @@ function Get-JobOptions {
 
 function New-StudioImportPlan {
     param([string]$JobId, [string]$BundleDir, [string]$PlanPath)
-    $manifest = Get-Content -Raw -LiteralPath (Join-Path $BundleDir 'bundle_manifest.json') | ConvertFrom-Json
-    $textureManifest = Get-Content -Raw -LiteralPath (Join-Path $BundleDir 'texture_manifest.json') | ConvertFrom-Json
+    $manifest = [IO.File]::ReadAllText((Join-Path $BundleDir 'bundle_manifest.json'), [Text.Encoding]::UTF8) | ConvertFrom-Json
+    $textureManifest = [IO.File]::ReadAllText((Join-Path $BundleDir 'texture_manifest.json'), [Text.Encoding]::UTF8) | ConvertFrom-Json
     $model = @($manifest.files | Where-Object { $_.kind -eq 'model' } | Select-Object -First 1)
     $animations = @($manifest.files | Where-Object { $_.kind -eq 'animation' })
     $preview = @($manifest.files | Where-Object { $_.kind -eq 'all_in_one' } | Select-Object -First 1)
@@ -297,7 +297,7 @@ function New-StudioImportPlan {
         }
     )
     $plan = [ordered]@{
-        schema_version = '1.2'
+        schema_version = '1.3'
         status = 'READY_FOR_STUDIO'
         job_id = $JobId
         formal_contract = 'model_bind_plus_one_action_files'
@@ -310,9 +310,10 @@ function New-StudioImportPlan {
         animation_import = [ordered]@{
             rig_type = 'CUSTOM'
             target_rig_path = $null
-            rest_pose_source = 'IMPORTED_SKELETON'
-            rest_pose_ui_zh = '导入的骨架（第二项）'
-            applicability_zh = '仅用于同一绑定骨架导出的单动作 FBX；骨架层级或休息姿势不一致时必须停止并转为重定向检查。'
+            rest_pose_source = 'UNDECIDED'
+            rest_pose_ui_zh = '待 Codex 检查本资源后判断'
+            rest_pose_decision = [ordered]@{ status = 'REVIEW_REQUIRED'; reason_zh = ''; evidence = ''; scope = $null }
+            applicability_zh = '先比较源/目标绑定姿势、层级、坐标和导出变换，用代表动作验证后仅在相同条件下复用。'
             local_import_policy = 'IMPORT_ALL_LOCALLY_THEN_PUBLISH_SELECTED'
             automation_mode = 'GUIDED_UI_LOOP'
             public_api_boundary_zh = 'Roblox 公开 Studio API 仍会逐个提示选择 FBX，不能把一组本地路径无交互地绑定到现有骨架；Codex 可按此队列自动执行并逐项验收。'
@@ -323,10 +324,10 @@ function New-StudioImportPlan {
             '在准确的目标体验中导入 model_bind.fbx，并启用 Add to Workspace。',
             '只上传 texture_manifest.json 中 delivered_file 指向的 Roblox 标准化 PNG；不要上传原始贴图或历史副本。',
             '上传后检查直接 rbxassetid 加载和当前体验权限。',
-            '在动画编辑器选择目标 Custom Rig；导入设置的休息姿势来源选择第二项“导入的骨架”。',
+            'Codex 检查源/目标骨架并记录休息姿势选项名称、理由与证据；未判断前不批量导入。',
             '先本地导入 canary_animation，确认动作开始、时间推进、骨骼变化和形变正常。',
             '金丝雀动作通过后按 animation_import.actions 将其余动作全部导入本地；先预览，默认只发布最终选中的动作。',
-            '每个已发布 AnimationId 都必须授权给当前 Universe，并在 fresh Play 中确认 Length 大于 0、TimePosition 推进且骨骼变化。',
+            '按动作名核对发布 ID；检查当前 Universe 权限，缺失才授权，再用 fresh Play 验证。',
             'model_all_in_one.fbx 若存在，只作预览，不作为跨电脑正式动画交付。'
         )
     }

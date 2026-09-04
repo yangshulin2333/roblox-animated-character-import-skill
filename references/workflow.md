@@ -1,7 +1,7 @@
 # 工作流：原始动画角色资源到 Roblox Studio
 
-**Version**: 2.1
-**Last verified**: 2026-09-03
+**Version**: 2.3
+**Last verified**: 2026-09-04
 **Status**: Review — scripts validated locally; each asset still requires its own Studio and permission evidence.
 
 ## Purpose and scope
@@ -305,7 +305,7 @@ For a saved or published target experience, keep **Add to Workspace** enabled on
 
 ## Gate P7 — animation import and playback
 
-Roblox documents one animation track per FBX. Import each action file onto the same target rig through Animation Editor. For one-action FBXs generated from the same bind skeleton, choose Custom Rig and the second rest-pose source, **“导入的骨架”**. Do not reuse this setting blindly for unrelated or retargeted skeletons. A multi-action FBX may be used only when it has passed on the exact target Studio version; it is not the cross-computer contract.
+Roblox documents one animation track per FBX. Import each action file onto the intended target rig through Animation Editor. Codex must assess the rest pose, hierarchy, units and export transforms, propose a named rest-pose option, then validate one representative action before reusing that decision. Same-source files do not imply a universal option. Follow the decision table in [studio-runbook.md](studio-runbook.md). A multi-action FBX may be used only when it has passed on the exact target Studio version; it is not the cross-computer contract.
 
 For every required action:
 
@@ -322,7 +322,7 @@ For every required action:
 
 Local `AnimSaves` and temporary keyframe hashes prove Studio-local preview only. Runtime reuse requires published animation IDs with valid owner/game permissions.
 
-Roblox's public Studio animation-import method still prompts for a file and does not accept a prepared file path. Therefore “batch import” means a guided, observable UI loop with one action checked at a time, not a headless one-call import. After every publish, grant the resulting AnimationId to the target Universe before fresh-Play validation.
+Roblox's public Studio animation-import method still prompts for a file and does not accept a prepared file path. Use available verified tooling for an observable batch; do not promise a headless one-call import. Check each published AnimationId's target-Universe permission and request a grant only when absent, then validate in fresh Play.
 
 ## Gate P8 — textures, ownership, and permissions
 
